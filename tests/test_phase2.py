@@ -116,7 +116,7 @@ def test_discovery():
         from core.discovery import discover_files, classify_files, get_repository_info
         
         # Test on parent directory (the repo root)
-        repo_path = parent_dir.parent  # Go up to ishan_version
+        repo_path = parent_dir
         console.print(f"📍 Testing discovery on: {repo_path.absolute()}")
         
         # Get repository info

@@ -22,6 +22,7 @@ class LanguageConfig:
         self.name_nodes = config_dict.get("name_nodes", ["identifier"])
         self.signature_templates = config_dict.get("signature_templates", {})
         self.tree_sitter_package = config_dict.get("tree_sitter_package", f"tree-sitter-{language}")
+        self.language_function = config_dict.get("language_function", "language")
     
     def get_template(self, symbol_type: str) -> str:
         """Get signature template for symbol type with fallback."""

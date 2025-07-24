@@ -13,10 +13,11 @@ except ImportError:
     Parser = None
     Language = None
 
-from ..schema import Symbol, SymbolType, FileInfo, DirectoryInfo, RepoSummary
-from ..extractors import get_signature_extractor
-from .config import get_language_config
-from .discovery import scan_repository, count_lines
+# Change relative imports to absolute imports
+from schema import Symbol, SymbolType, FileInfo, DirectoryInfo, RepoSummary
+from extractors import get_signature_extractor
+from core.config import get_language_config
+from core.discovery import scan_repository, count_lines
 
 console = Console()
 
@@ -25,144 +26,76 @@ _parser_cache: Dict[str, Optional[Parser]] = {}
 
 
 def get_parser_for_language(language: str) -> Optional[Parser]:
-    """Get tree-sitter parser for language with caching and dynamic loading."""
+    """Get tree-sitter parser using the unified API."""
     if not TREE_SITTER_AVAILABLE:
-        console.print("⚠️ Tree-sitter not available")
         return None
     
     if language in _parser_cache:
         return _parser_cache[language]
     
-    config = get_language_config(language)
-    if not config:
-        console.print(f"⚠️ No configuration found for language: {language}")
-        _parser_cache[language] = None
-        return None
-    
-    package_name = config.tree_sitter_package
-    module_name = package_name.replace('-', '_')
-    
     try:
-        # Dynamic import of tree-sitter language module
-        language_module = __import__(module_name, fromlist=['language'])
+        # Import the unified API
+        from tree_sitter_languages import get_language
         
-        # Try different API patterns for tree-sitter
+        # Unified language loading - no more version compatibility issues!
+        language_obj = get_language(language)
+        
+        # Create parser with unified API
         parser = Parser()
-        
-        # Method 1: New API with Language wrapper
-        try:
-            language_func = getattr(language_module, 'language')
-            if callable(language_func):
-                # Try new API: Language(capsule, name)
-                try:
-                    language_obj = Language(language_func(), name=language)
-                except TypeError:
-                    # Try old API: Language(capsule) 
-                    try:
-                        language_obj = Language(language_func())
-                    except:
-                        # Direct assignment
-                        language_obj = language_func()
-            else:
-                language_obj = language_func
-            
-            parser.language = language_obj
-            
-        except Exception as api_error:
-            console.print(f"❌ API error for {language}: {api_error}")
-            # Try alternative: direct set_language method
-            try:
-                language_func = getattr(language_module, 'language')
-                parser.set_language(language_func())
-            except Exception as alt_error:
-                console.print(f"❌ Alternative API failed for {language}: {alt_error}")
-                _parser_cache[language] = None
-                return None
+        parser.set_language(language_obj)
         
         _parser_cache[language] = parser
         console.print(f"✅ Loaded parser for {language}")
         return parser
         
-    except ImportError as e:
-        console.print(f"❌ Parser not available for {language}: {e}")
-        _parser_cache[language] = None
-        return None
     except Exception as e:
-        console.print(f"❌ Error creating parser for {language}: {e}")
+        console.print(f"❌ Parser failed for {language}: {e}")
+        console.print(f"    Try: pip install tree-sitter-languages")
         _parser_cache[language] = None
         return None
 
 
 def extract_symbols_generic(source_code: str, language: str) -> List[Symbol]:
-    """
-    THE core function - Generic symbol extraction for any configured language.
-    
-    This replaces ALL language-specific extraction functions!
-    """
+    """Generic symbol extraction using your proven pattern."""
     config = get_language_config(language)
-    if not config:
-        console.print(f"⚠️ Language {language} not configured")
-        return []
-    
     parser = get_parser_for_language(language)
-    if not parser:
-        console.print(f"⚠️ Parser not available for {language}")
+    if not config or not parser:
         return []
     
     extractor = get_signature_extractor(language)
     
-    # Parse source code
-    try:
-        source_bytes = bytes(source_code, "utf8")
-        tree = parser.parse(source_bytes)
-        root_node = tree.root_node
-    except Exception as e:
-        console.print(f"❌ Parse error for {language}: {e}")
-        return []
-    
+    # Parse source
+    source_bytes = bytes(source_code, "utf8")
+    tree = parser.parse(source_bytes)
     symbols = []
     
     def visit_node(node, parent_symbols=None, inside_class=False):
-        """Generic tree traversal using language configuration."""
         if parent_symbols is None:
             parent_symbols = symbols
         
-        # Check for class/interface nodes
+        # Use configuration to check node types
         if node.type in config.class_nodes:
             class_symbol = _extract_class_symbol(node, source_code, config, extractor, language)
             if class_symbol:
                 parent_symbols.append(class_symbol)
-                # Process children within class context
+                # Recurse with class_symbol.children as parent
                 for child in node.children:
                     visit_node(child, class_symbol.children, inside_class=True)
         
-        # Check for interface nodes (if configured)
-        elif hasattr(config, 'interface_nodes') and node.type in config.interface_nodes:
-            interface_symbol = _extract_interface_symbol(node, source_code, config, extractor, language)
-            if interface_symbol:
-                parent_symbols.append(interface_symbol)
-                # Process children within interface context
-                for child in node.children:
-                    visit_node(child, interface_symbol.children, inside_class=True)
-        
-        # Check for function/method nodes
         elif node.type in config.function_nodes:
-            function_symbol = _extract_function_symbol(
-                node, source_code, config, extractor, language, inside_class
-            )
+            function_symbol = _extract_function_symbol(node, source_code, config, extractor, language, inside_class)
             if function_symbol:
                 parent_symbols.append(function_symbol)
-                # Process children within function context (for nested functions)
+                # Recurse with function_symbol.children as parent
                 for child in node.children:
                     visit_node(child, function_symbol.children, inside_class)
         
         else:
-            # Continue traversing for other node types
+            # Continue traversing with same parent_symbols
             for child in node.children:
                 visit_node(child, parent_symbols, inside_class)
     
-    # Start traversal
-    visit_node(root_node)
+    visit_node(tree.root_node)
     return symbols
 
 
@@ -296,7 +229,7 @@ def process_repository(repo_path: Path,
     scan_results = scan_repository(repo_path, language_filter, max_files)
     
     # Check language availability and offer installation
-    from .config import show_language_status_and_install
+    from core.config import show_language_status_and_install
     availability = show_language_status_and_install(repo_path)
     
     # Build repository structure
@@ -317,7 +250,14 @@ def process_repository(repo_path: Path,
         for file_path in file_list:
             try:
                 # Make path relative to repo root
-                rel_path = file_path.relative_to(repo_path)
+                try:
+                    # Ensure both paths are absolute
+                    abs_file = file_path.resolve()
+                    abs_repo = repo_path.resolve()
+                    rel_path = abs_file.relative_to(abs_repo)
+                except ValueError:
+                    # Fallback if paths are incompatible
+                    rel_path = file_path.name
                 file_info = process_file(file_path, language)
                 file_info.path = str(rel_path)
                 

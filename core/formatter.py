@@ -1,7 +1,7 @@
 """Enhanced formatting for multi-language repository output."""
 
 from typing import List, Dict
-from ..schema import RepoSummary, DirectoryInfo, FileInfo, Symbol, SymbolType
+from schema import RepoSummary, DirectoryInfo, FileInfo, Symbol, SymbolType
 
 
 class EnhancedTreeFormatter:
