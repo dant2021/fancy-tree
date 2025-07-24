@@ -1,0 +1,95 @@
+# Extended language configuration for fancy_tree
+# Multi-language symbol extraction with tree-sitter
+
+python:
+  extensions: [".py"]
+  function_nodes: ["function_definition"]
+  class_nodes: ["class_definition"] 
+  name_nodes: ["identifier"]
+  signature_templates:
+    function: "def {name}({params})"
+    method: "def {name}({params})"
+    class: "class {name}"
+  tree_sitter_package: "tree-sitter-python"
+  
+typescript:
+  extensions: [".ts", ".tsx"]
+  function_nodes: ["function_declaration", "method_definition", "arrow_function"]
+  class_nodes: ["class_declaration"]
+  interface_nodes: ["interface_declaration"]
+  name_nodes: ["identifier", "type_identifier"]
+  signature_templates:
+    function: "function {name}({params}): {return_type}"
+    method: "{name}({params}): {return_type}"
+    class: "class {name}"
+    interface: "interface {name}"
+  tree_sitter_package: "tree-sitter-typescript"
+
+java:
+  extensions: [".java"]
+  function_nodes: ["method_declaration", "constructor_declaration"]
+  class_nodes: ["class_declaration", "interface_declaration", "enum_declaration"]
+  name_nodes: ["identifier"]
+  signature_templates:
+    method: "{visibility} {return_type} {name}({params})"
+    constructor: "{visibility} {name}({params})"
+    class: "{visibility} class {name}"
+    interface: "{visibility} interface {name}"
+    enum: "{visibility} enum {name}"
+  tree_sitter_package: "tree-sitter-java"
+
+# Placeholder configurations for future languages
+javascript:
+  extensions: [".js", ".jsx"]
+  function_nodes: ["function_declaration", "method_definition", "arrow_function"]
+  class_nodes: ["class_declaration"]
+  name_nodes: ["identifier"]
+  signature_templates:
+    function: "function {name}({params})"
+    method: "{name}({params})"
+    class: "class {name}"
+  tree_sitter_package: "tree-sitter-javascript"
+
+rust:
+  extensions: [".rs"]
+  function_nodes: ["function_item"]
+  class_nodes: ["struct_item", "impl_item", "trait_item"]
+  name_nodes: ["identifier", "type_identifier"]
+  signature_templates:
+    function: "fn {name}({params}) -> {return_type}"
+    struct: "struct {name}"
+    trait: "trait {name}"
+  tree_sitter_package: "tree-sitter-rust"
+
+go:
+  extensions: [".go"]
+  function_nodes: ["function_declaration", "method_declaration"]
+  class_nodes: ["type_declaration"]
+  name_nodes: ["identifier"]
+  signature_templates:
+    function: "func {name}({params}) {return_type}"
+    method: "func ({receiver}) {name}({params}) {return_type}"
+    type: "type {name}"
+  tree_sitter_package: "tree-sitter-go"
+
+# Build files and special configurations
+build_files:
+  - "build.gradle"
+  - "build.gradle.kts" 
+  - "pom.xml"
+  - "package.json"
+  - "Cargo.toml"
+  - "go.mod"
+  - "pyproject.toml"
+  - "requirements.txt"
+
+# File patterns to ignore
+ignore_patterns:
+  - "__pycache__"
+  - "node_modules"
+  - ".git"
+  - "dist"
+  - "build"
+  - "target"
+  - "*.pyc"
+  - "*.class"

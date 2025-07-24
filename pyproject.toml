@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fancy-tree"
+version = "1.0.0"
+description = "Git-enabled, cross-language code analysis with tree-sitter"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Ishan Tiwari", email = "ishan@example.com"},
+]
+keywords = ["git", "tree-sitter", "code-analysis", "multi-language", "ast"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9", 
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# Core dependencies only - language parsers loaded dynamically
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0", 
+    "tree-sitter>=0.20.0",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+# Language support as optional extras
+python = ["tree-sitter-python>=0.20.0"]
+typescript = ["tree-sitter-typescript>=0.20.0"] 
+java = ["tree-sitter-java>=0.20.0"]
+javascript = ["tree-sitter-javascript>=0.20.0"]
+rust = ["tree-sitter-rust>=0.20.0"]
+go = ["tree-sitter-go>=0.20.0"]
+cpp = ["tree-sitter-cpp>=0.20.0"]
+
+all-languages = [
+    "tree-sitter-python>=0.20.0",
+    "tree-sitter-typescript>=0.20.0",
+    "tree-sitter-java>=0.20.0",
+    "tree-sitter-javascript>=0.20.0",
+    "tree-sitter-rust>=0.20.0",
+    "tree-sitter-go>=0.20.0",
+    "tree-sitter-cpp>=0.20.0",
+]
+
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/IshanTiwari0112/fancy-tree"
+"Bug Reports" = "https://github.com/IshanTiwari0112/fancy-tree/issues"
+"Source" = "https://github.com/IshanTiwari0112/fancy-tree"
+
+[project.scripts]
+fancy-tree = "fancy_tree.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fancy_tree*"]
+
+[tool.setuptools.package-data]
+"fancy_tree.config" = ["languages.yaml"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
