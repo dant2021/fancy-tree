@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Antoine Descamps, Ishan Tiwari", email = "ishan@example.com"},
+    {name = "Antoine Descamps, Ishan Tiwari"},
 ]
 keywords = ["git", "tree-sitter", "code-analysis", "multi-language", "ast"]
 classifiers = [
