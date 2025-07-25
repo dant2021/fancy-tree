@@ -28,35 +28,25 @@ fancy-tree scan . --lang python javascript
 
 # Limit files (for large repos)
 fancy-tree scan . --max-files 50
-
+```
 
 ## Sample Output
 ```
 Repository: my-awesome-app
-
 Total files: 42, Total lines: 3,847
 
 PYTHON Files (15 files, SUPPORTED):
-
 [FILE] user_service.py (python, 156 lines)
-
-class UserService:
-
-def create_user(self, name: str, email: str) -> User # line 23
-
-def delete_user(self, user_id: int) -> bool # line 45
-
-def validate_email(email: str) -> bool # line 67
+  class UserService:
+    def create_user(self, name: str, email: str) -> User # line 23
+    def delete_user(self, user_id: int) -> bool # line 45
+    def validate_email(email: str) -> bool # line 67
 
 TYPESCRIPT Files (8 files, SUPPORTED):
-
 [FILE] Button.tsx (typescript, 89 lines)
-
 interface ButtonProps # line 5
-
 function Button(props: ButtonProps): JSX.Element # line 12
 ```
-
 ## Contributing
 
 This project is **work in progress** and we'd love your help! Adding language support is surprisingly easy:
