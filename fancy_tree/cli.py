@@ -9,8 +9,8 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
-from core.extraction import process_repository
-from core.formatter import format_repository_tree
+from .core.extraction import process_repository
+from .core.formatter import format_repository_tree
 
 app = typer.Typer(name="fancy-tree", help="Git-enabled, cross-language code analysis with tree-sitter")
 console = Console()
@@ -90,8 +90,8 @@ def scan(
 @app.command()
 def languages():
     """List supported languages and their status."""
-    from extractors import list_supported_languages
-    from core.config import detect_available_languages
+    from .extractors import list_supported_languages
+    from .core.config import detect_available_languages
     
     console.print(Panel("Fancy Tree - Supported Languages", style="bold blue"))
     
@@ -121,7 +121,7 @@ def languages():
 def version():
     """Show version information."""
     try:
-        from __init__ import __version__
+        from . import __version__
     except ImportError:
         __version__ = "1.0.0"
     console.print(f"fancy-tree version {__version__}")

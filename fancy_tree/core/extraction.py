@@ -3,21 +3,13 @@
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from rich.console import Console
-
-# Try different tree-sitter import patterns
-try:
-    from tree_sitter import Parser, Language
-    TREE_SITTER_AVAILABLE = True
-except ImportError:
-    TREE_SITTER_AVAILABLE = False
-    Parser = None
-    Language = None
+from tree_sitter import Parser, Language
 
 # Change relative imports to absolute imports
-from schema import Symbol, SymbolType, FileInfo, DirectoryInfo, RepoSummary
-from extractors import get_signature_extractor
-from core.config import get_language_config
-from core.discovery import scan_repository, count_lines
+from ..schema import Symbol, SymbolType, FileInfo, DirectoryInfo, RepoSummary
+from ..extractors import get_signature_extractor
+from .config import get_language_config
+from .discovery import scan_repository, count_lines
 
 console = Console()
 
@@ -26,23 +18,16 @@ _parser_cache: Dict[str, Optional[Parser]] = {}
 
 
 def get_parser_for_language(language: str) -> Optional[Parser]:
-    """Get tree-sitter parser using the unified API."""
-    if not TREE_SITTER_AVAILABLE:
-        return None
-    
+    """Get tree-sitter parser using tree-sitter-language-pack."""
     if language in _parser_cache:
         return _parser_cache[language]
     
     try:
-        # Import the unified API
-        from tree_sitter_languages import get_language
+        # Use the better maintained tree-sitter-language-pack
+        from tree_sitter_language_pack import get_parser
         
-        # Unified language loading - no more version compatibility issues!
-        language_obj = get_language(language)
-        
-        # Create parser with unified API
-        parser = Parser()
-        parser.set_language(language_obj)
+        # This gives us a ready-to-use parser!
+        parser = get_parser(language)
         
         _parser_cache[language] = parser
         console.print(f"Loaded parser for {language}")
@@ -50,7 +35,7 @@ def get_parser_for_language(language: str) -> Optional[Parser]:
         
     except Exception as e:
         console.print(f"ERROR: Parser failed for {language}: {e}")
-        console.print(f"    Try: pip install tree-sitter-languages")
+        console.print(f"    Try: pip install tree-sitter-language-pack")
         _parser_cache[language] = None
         return None
 
@@ -229,7 +214,7 @@ def process_repository(repo_path: Path,
     scan_results = scan_repository(repo_path, language_filter, max_files)
     
     # Check language availability and offer installation
-    from core.config import show_language_status_and_install
+    from .config import show_language_status_and_install
     availability = show_language_status_and_install(repo_path)
     
     # Build repository structure

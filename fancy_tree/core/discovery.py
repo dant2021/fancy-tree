@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Set
 from rich.console import Console
 
-from core.config import detect_language, config_manager
+from .config import detect_language, config_manager
 
 console = Console()
 
