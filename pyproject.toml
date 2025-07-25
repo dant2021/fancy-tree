@@ -70,7 +70,7 @@ dev = [
 "Source" = "https://github.com/IshanTiwari0112/fancy-tree"
 
 [project.scripts]
-fancy-tree = "fancy_tree.cli:app"
+fancy-tree = "cli:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
