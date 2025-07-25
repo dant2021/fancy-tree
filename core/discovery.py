@@ -23,13 +23,13 @@ def discover_files(repo_path: Path, include_ignored: bool = False) -> List[Path]
     if not include_ignored:
         git_files = _get_git_files(repo_path)
         if git_files is not None:
-            console.print(f"📂 Using git ls-files: found {len(git_files)} tracked files")
+            console.print(f"Using git ls-files: found {len(git_files)} tracked files")
             return git_files
     
     # Fallback to filesystem traversal
-    console.print("📂 Git not available, using filesystem traversal")
+    console.print("Git not available, using filesystem traversal")
     fs_files = _get_filesystem_files(repo_path)
-    console.print(f"📂 Found {len(fs_files)} files via filesystem scan")
+    console.print(f"Found {len(fs_files)} files via filesystem scan")
     return fs_files
 
 
@@ -108,7 +108,7 @@ def classify_files(files: List[Path]) -> Dict[str, List[Path]]:
     
     # Report classification results
     total_classified = sum(len(files) for files in classified.values())
-    console.print(f"📊 Classified {total_classified} files, {len(unclassified)} unclassified")
+    console.print(f"Classified {total_classified} files, {len(unclassified)} unclassified")
     
     for language, lang_files in classified.items():
         console.print(f"  {language}: {len(lang_files)} files")
@@ -196,13 +196,13 @@ def scan_repository(repo_path: Path,
                    include_ignored: bool = False) -> Dict[str, any]:
     """Complete repository scan with classification and filtering."""
     
-    console.print(f"🔍 Scanning repository: {repo_path}")
+    console.print(f"Scanning repository: {repo_path}")
     
     # Get repository info
     repo_info = get_repository_info(repo_path)
-    console.print(f"📁 Repository: {repo_info['name']}")
+    console.print(f"Repository: {repo_info['name']}")
     if repo_info['current_branch']:
-        console.print(f"🌿 Branch: {repo_info['current_branch']}")
+        console.print(f"Branch: {repo_info['current_branch']}")
     
     # Discover files
     all_files = discover_files(repo_path, include_ignored)
@@ -210,12 +210,12 @@ def scan_repository(repo_path: Path,
     # Apply language filter
     if language_filter:
         all_files = filter_files_by_language(all_files, language_filter)
-        console.print(f"🔍 Filtered to {len(all_files)} files for languages: {', '.join(language_filter)}")
+        console.print(f"Filtered to {len(all_files)} files for languages: {', '.join(language_filter)}")
     
     # Apply file limit
     if max_files and len(all_files) > max_files:
         all_files = all_files[:max_files]
-        console.print(f"📊 Limited to {max_files} files")
+        console.print(f"Limited to {max_files} files")
     
     # Classify by language
     classified_files = classify_files(all_files)

@@ -69,7 +69,7 @@ class ConfigManager:
             self._loaded = True
             
         except (FileNotFoundError, yaml.YAMLError) as e:
-            console.print(f"⚠️ Warning: Could not load language config: {e}")
+            console.print(f"Warning: Could not load language config: {e}")
     
     def get_language_config(self, language: str) -> Optional[LanguageConfig]:
         """Get configuration for specific language."""
@@ -160,9 +160,9 @@ class ConfigManager:
         if not missing_packages:
             return True
         
-        console.print(f"📦 Missing tree-sitter packages for optimal support:")
+        console.print(f"Missing tree-sitter packages for optimal support:")
         for package in missing_packages:
-            console.print(f"  • {package}")
+            console.print(f"  - {package}")
         
         install = typer.confirm("Install missing packages automatically?")
         
@@ -181,27 +181,27 @@ class ConfigManager:
                     )
                     
                     if result.returncode == 0:
-                        console.print(f"✅ {package} installed successfully")
+                        console.print(f"SUCCESS: {package} installed successfully")
                         success_count += 1
                     else:
-                        console.print(f"❌ Failed to install {package}: {result.stderr}")
+                        console.print(f"ERROR: Failed to install {package}: {result.stderr}")
                         
                 except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
-                    console.print(f"❌ Error installing {package}: {e}")
+                    console.print(f"ERROR: Error installing {package}: {e}")
             
             if success_count == len(missing_packages):
-                console.print("🎉 All packages installed successfully!")
+                console.print("SUCCESS: All packages installed successfully!")
                 return True
             else:
-                console.print(f"⚠️ {success_count}/{len(missing_packages)} packages installed")
+                console.print(f"WARNING: {success_count}/{len(missing_packages)} packages installed")
                 return False
         else:
-            console.print("ℹ️ Continuing with available languages only")
+            console.print("INFO: Continuing with available languages only")
             return False
     
     def show_language_status(self, language_availability: Dict[str, Dict[str, Any]]) -> None:
         """Display language support status."""
-        console.print("🔍 Language Support Status:")
+        console.print("Language Support Status:")
         
         if not language_availability:
             console.print("  No supported languages detected in repository")
@@ -216,16 +216,16 @@ class ConfigManager:
             
             if has_files:
                 if parser_available:
-                    console.print(f"  ✅ {lang}: {file_count} files (parser available)")
+                    console.print(f"  SUPPORTED: {lang}: {file_count} files (parser available)")
                 else:
-                    console.print(f"  ❌ {lang}: {file_count} files (parser missing)")
+                    console.print(f"  NOT_SUPPORTED: {lang}: {file_count} files (parser missing)")
                     missing_packages.append(info["package_name"])
         
         if missing_packages:
-            console.print(f"\n💡 To enable full support: pip install {' '.join(missing_packages)}")
+            console.print(f"\nTIP: To enable full support: pip install {' '.join(missing_packages)}")
             return missing_packages
         else:
-            console.print("\n🎉 All detected languages have parser support!")
+            console.print("\nSUCCESS: All detected languages have parser support!")
             return []
 
 

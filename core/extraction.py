@@ -45,11 +45,11 @@ def get_parser_for_language(language: str) -> Optional[Parser]:
         parser.set_language(language_obj)
         
         _parser_cache[language] = parser
-        console.print(f"✅ Loaded parser for {language}")
+        console.print(f"Loaded parser for {language}")
         return parser
         
     except Exception as e:
-        console.print(f"❌ Parser failed for {language}: {e}")
+        console.print(f"ERROR: Parser failed for {language}: {e}")
         console.print(f"    Try: pip install tree-sitter-languages")
         _parser_cache[language] = None
         return None
@@ -110,7 +110,7 @@ def _extract_class_symbol(node, source_code: str, config, extractor, language: s
         template = config.get_template("class")
         signature = extractor.extract_class_signature(node, source_code, template)
     except Exception as e:
-        console.print(f"⚠️ Signature extraction failed for class {name}: {e}")
+        console.print(f"WARNING: Signature extraction failed for class {name}: {e}")
         signature = f"class {name}"
     
     return Symbol(
@@ -192,7 +192,7 @@ def extract_symbols_from_file(file_path: Path, language: str) -> List[Symbol]:
         return extract_symbols_generic(source_code, language)
         
     except Exception as e:
-        console.print(f"❌ Error reading {file_path}: {e}")
+        console.print(f"ERROR: Error reading {file_path}: {e}")
         return []
 
 
@@ -223,7 +223,7 @@ def process_repository(repo_path: Path,
     
     This is the high-level entry point that coordinates everything.
     """
-    console.print(f"🚀 Processing repository with fancy_tree...")
+    console.print(f"Processing repository with fancy_tree...")
     
     # Scan repository
     scan_results = scan_repository(repo_path, language_filter, max_files)
@@ -240,7 +240,7 @@ def process_repository(repo_path: Path,
     total_processed = 0
     
     for language, file_list in scan_results["classified_files"].items():
-        console.print(f"📝 Processing {len(file_list)} {language} files...")
+        console.print(f"Processing {len(file_list)} {language} files...")
         
         # Check if language is supported
         lang_info = availability.get(language, {})
@@ -267,10 +267,10 @@ def process_repository(repo_path: Path,
                 total_processed += 1
                 
             except Exception as e:
-                console.print(f"❌ Error processing {file_path}: {e}")
+                console.print(f"ERROR: Error processing {file_path}: {e}")
                 continue
     
-    console.print(f"✅ Processed {total_processed} files")
+    console.print(f"Processed {total_processed} files")
     
     # Create repository summary
     repo_summary = RepoSummary(
