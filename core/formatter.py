@@ -16,15 +16,15 @@ class EnhancedTreeFormatter:
         lines = []
         
         # Repository header
-        lines.append(f"📁 Repository: {repo_summary.name}")
-        lines.append(f"📊 Total files: {repo_summary.total_files}, Total lines: {repo_summary.total_lines}")
+        lines.append(f"Repository: {repo_summary.name}")
+        lines.append(f"Total files: {repo_summary.total_files}, Total lines: {repo_summary.total_lines}")
         lines.append("")
         
         # Language support status
-        lines.append("🔍 Language Support:")
+        lines.append("Language Support:")
         for lang, count in repo_summary.languages.items():
-            support_icon = "✅" if repo_summary.supported_languages.get(lang, False) else "❌"
-            lines.append(f"  {support_icon} {lang}: {count} files")
+            support_status = "SUPPORTED" if repo_summary.supported_languages.get(lang, False) else "NOT_SUPPORTED"
+            lines.append(f"  {lang}: {count} files ({support_status})")
         lines.append("")
         
         if self.group_by_language:
@@ -49,9 +49,9 @@ class EnhancedTreeFormatter:
         # Format each language group
         for language in sorted(files_by_language.keys()):
             files = files_by_language[language]
-            support_icon = "✅" if repo_summary.supported_languages.get(language, False) else "❌"
+            support_status = "SUPPORTED" if repo_summary.supported_languages.get(language, False) else "NOT_SUPPORTED"
             
-            lines.append(f"{support_icon} {language.title()} Files ({len(files)} files):")
+            lines.append(f"{language.upper()} Files ({len(files)} files, {support_status}):")
             
             # Sort files within language
             sorted_files = sorted(files, key=lambda f: f.path)
@@ -70,7 +70,7 @@ class EnhancedTreeFormatter:
         return lines
     
     def _format_directory(self, dir_info: DirectoryInfo, lines: List[str], depth: int):
-        """Format directory structure (enhanced from old version)."""
+        """Format directory structure."""
         # Sort files by language, then by name
         sorted_files = sorted(dir_info.files, key=lambda f: (f.language, f.path))
         
@@ -81,14 +81,14 @@ class EnhancedTreeFormatter:
         sorted_subdirs = sorted(dir_info.subdirs, key=lambda d: d.path)
         for subdir in sorted_subdirs:
             dir_name = subdir.path.split('/')[-1] if '/' in subdir.path else subdir.path
-            lines.append(self._indent(depth) + f"📁 {dir_name}/")
+            lines.append(self._indent(depth) + f"[DIR] {dir_name}/")
             self._format_directory(subdir, lines, depth + 1)
     
     def _format_file(self, file_info: FileInfo, lines: List[str], depth: int):
         """Format a single file with enhanced language info."""
         # File header with language and signature support
         filename = file_info.path.split('/')[-1] if '/' in file_info.path else file_info.path
-        support_indicator = "🔧" if file_info.has_signature_support else "📄"
+        support_indicator = "[SIG]" if file_info.has_signature_support else "[FILE]"
         
         file_line = f"{support_indicator} {filename} ({file_info.language}, {file_info.lines} lines)"
         lines.append(self._indent(depth) + file_line)
@@ -131,7 +131,7 @@ class EnhancedTreeFormatter:
     
     def _indent(self, depth: int) -> str:
         """Generate indentation string."""
-        return " " * (depth * self.indent_size)
+        return "  " * depth
 
 
 # Convenience function
