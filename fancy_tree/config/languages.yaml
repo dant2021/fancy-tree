@@ -38,7 +38,6 @@ java:
     enum: "{visibility} enum {name}"
   tree_sitter_package: "tree-sitter-java"
 
-# Placeholder configurations for future languages
 javascript:
   extensions: [".js", ".jsx"]
   function_nodes: ["function_declaration", "method_definition", "arrow_function"]
@@ -71,6 +70,124 @@ go:
     method: "func ({receiver}) {name}({params}) {return_type}"
     type: "type {name}"
   tree_sitter_package: "tree-sitter-go"
+
+c:
+  extensions: [".c", ".h"]
+  function_nodes: ["function_definition", "function_declarator"]
+  class_nodes: ["struct_specifier", "union_specifier", "enum_specifier"]
+  name_nodes: ["identifier"]
+  signature_templates:
+    function: "{return_type} {name}({params})"
+    struct: "struct {name}"
+    enum: "enum {name}"
+  tree_sitter_package: "tree-sitter-c"
+
+cpp:
+  extensions: [".cpp", ".cc", ".cxx", ".hpp", ".h++", ".hxx"]
+  function_nodes: ["function_definition", "function_declarator"]
+  class_nodes: ["class_specifier", "struct_specifier", "enum_specifier"]
+  name_nodes: ["identifier", "type_identifier"]
+  signature_templates:
+    function: "{return_type} {name}({params})"
+    class: "class {name}"
+    struct: "struct {name}"
+  tree_sitter_package: "tree-sitter-cpp"
+
+csharp:
+  extensions: [".cs"]
+  function_nodes: ["method_declaration", "constructor_declaration"]
+  class_nodes: ["class_declaration", "interface_declaration", "struct_declaration"]
+  name_nodes: ["identifier"]
+  signature_templates:
+    method: "{visibility} {return_type} {name}({params})"
+    class: "{visibility} class {name}"
+    interface: "{visibility} interface {name}"
+  tree_sitter_package: "tree-sitter-c-sharp"
+
+php:
+  extensions: [".php"]
+  function_nodes: ["function_definition", "method_declaration"]
+  class_nodes: ["class_declaration", "interface_declaration", "trait_declaration"]
+  name_nodes: ["name"]
+  signature_templates:
+    function: "function {name}({params})"
+    method: "function {name}({params})"
+    class: "class {name}"
+  tree_sitter_package: "tree-sitter-php"
+
+ruby:
+  extensions: [".rb"]
+  function_nodes: ["method", "singleton_method"]
+  class_nodes: ["class", "module"]
+  name_nodes: ["identifier", "constant"]
+  signature_templates:
+    method: "def {name}({params})"
+    class: "class {name}"
+    module: "module {name}"
+  tree_sitter_package: "tree-sitter-ruby"
+
+swift:
+  extensions: [".swift"]
+  function_nodes: ["function_declaration"]
+  class_nodes: ["class_declaration", "struct_declaration", "protocol_declaration"]
+  name_nodes: ["simple_identifier"]
+  signature_templates:
+    function: "func {name}({params}) -> {return_type}"
+    class: "class {name}"
+    struct: "struct {name}"
+  tree_sitter_package: "tree-sitter-swift"
+
+kotlin:
+  extensions: [".kt", ".kts"]
+  function_nodes: ["function_declaration"]
+  class_nodes: ["class_declaration", "interface_declaration", "object_declaration"]
+  name_nodes: ["simple_identifier"]
+  signature_templates:
+    function: "fun {name}({params}): {return_type}"
+    class: "class {name}"
+    interface: "interface {name}"
+  tree_sitter_package: "tree-sitter-kotlin"
+
+elixir:
+  extensions: [".ex", ".exs"]
+  function_nodes: ["call"]  # Elixir uses def as a call
+  class_nodes: ["call"]     # defmodule is also a call
+  name_nodes: ["identifier", "atom"]
+  signature_templates:
+    function: "def {name}({params})"
+    module: "defmodule {name}"
+  tree_sitter_package: "tree-sitter-elixir"
+
+lua:
+  extensions: [".lua"]
+  function_nodes: ["function_declaration", "local_function", "function_definition"]
+  class_nodes: []  # Lua doesn't have built-in classes
+  name_nodes: ["identifier"]
+  signature_templates:
+    function: "function {name}({params})"
+    local_function: "local function {name}({params})"
+  tree_sitter_package: "tree-sitter-lua"
+
+scala:
+  extensions: [".scala"]
+  function_nodes: ["function_definition"]
+  class_nodes: ["class_definition", "object_definition", "trait_definition"]
+  name_nodes: ["identifier"]
+  signature_templates:
+    function: "def {name}({params}): {return_type}"
+    class: "class {name}"
+    object: "object {name}"
+  tree_sitter_package: "tree-sitter-scala"
+
+haskell:
+  extensions: [".hs", ".lhs"]
+  function_nodes: ["function"]
+  class_nodes: ["data_type", "type_class"]
+  name_nodes: ["variable", "constructor"]
+  signature_templates:
+    function: "{name} :: {type}"
+    data: "data {name}"
+  tree_sitter_package: "tree-sitter-haskell"
 
 # Build files and special configurations
 build_files:
