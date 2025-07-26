@@ -121,8 +121,8 @@ class EnhancedTreeFormatter:
             prefix = self._get_symbol_prefix(symbol.type)
             symbol_line = f"{prefix}{symbol.name}"
         
-        # Add line number
-        symbol_line += f"  # line {symbol.line}"
+        # Remove line number from pretty output (kept in JSON)
+        # symbol_line += f"  # line {symbol.line}"
         
         lines.append(self._indent(depth) + symbol_line)
         

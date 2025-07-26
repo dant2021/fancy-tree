@@ -15,18 +15,37 @@ from .core.formatter import format_repository_tree
 app = typer.Typer(name="fancy-tree", help="Git-enabled, cross-language code analysis with tree-sitter")
 console = Console()
 
+# Define subcommand names to avoid treating them as paths
+SUBCOMMAND_NAMES = {"languages", "version", "test"}
 
-@app.command()
-def scan(
+
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
     path: Optional[Path] = typer.Argument(None, help="Repository path to scan (default: current directory)"),
     languages: Optional[List[str]] = typer.Option(None, "--lang", "-l", help="Filter by specific languages"),
     max_files: Optional[int] = typer.Option(None, "--max-files", "-m", help="Maximum number of files to process"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path (default: stdout)"),
-    format: str = typer.Option("tree", "--format", "-f", help="Output format: tree, json"),
-    group_by_language: bool = typer.Option(True, "--group-by-lang/--group-by-structure", help="Group output by language or directory structure"),
+    json_output: bool = typer.Option(False, "--json", help="Output in JSON format"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output"),
 ):
-    """Scan a repository and extract code structure."""
+    """Git-enabled, cross-language code analysis with tree-sitter.
+    
+    By default, fancy-tree scans the current directory and shows the code structure.
+    """
+    # If a subcommand was invoked, don't run the main scan logic
+    if ctx.invoked_subcommand is not None:
+        return
+    
+    # Manual routing for subcommand names passed as path
+    if path and str(path) in SUBCOMMAND_NAMES:
+        if str(path) == "version":
+            version_command()
+        elif str(path) == "languages":
+            languages_command()
+        elif str(path) == "test":
+            test_command(None)
+        return
     
     # Default to current directory
     if path is None:
@@ -56,17 +75,14 @@ def scan(
             max_files=max_files
         )
         
-        # Format output
-        if format == "json":
+        # Format output - always group by structure now
+        if json_output:
             output_content = json.dumps(repo_summary.to_dict(), indent=2)
-        elif format == "tree":
+        else:
             output_content = format_repository_tree(
                 repo_summary, 
-                group_by_language=group_by_language
+                group_by_language=False  # Always structure grouping
             )
-        else:
-            console.print(f"Error: Unknown format '{format}'. Use 'tree' or 'json'", style="red")
-            raise typer.Exit(1)
         
         # Output results
         if output:
@@ -87,9 +103,17 @@ def scan(
         raise typer.Exit(1)
 
 
-@app.command()
-def languages():
-    """List supported languages and their status."""
+def version_command():
+    """Actual version logic."""
+    try:
+        from . import __version__
+    except ImportError:
+        __version__ = "0.1.0"
+    console.print(f"fancy-tree version {__version__}")
+
+
+def languages_command():
+    """Actual languages logic."""
     from .extractors import list_supported_languages
     from .core.config import detect_available_languages
     
@@ -117,21 +141,8 @@ def languages():
         console.print(f"\nNote: Could not detect languages in current directory: {e}")
 
 
-@app.command()
-def version():
-    """Show version information."""
-    try:
-        from . import __version__
-    except ImportError:
-        __version__ = "1.0.0"
-    console.print(f"fancy-tree version {__version__}")
-
-
-@app.command()
-def test(
-    path: Optional[Path] = typer.Argument(None, help="Path to test (default: current directory)")
-):
-    """Test fancy_tree functionality on a directory."""
+def test_command(path: Optional[Path]):
+    """Actual test logic."""
     if path is None:
         path = Path.cwd()
     
@@ -154,6 +165,24 @@ def test(
     except Exception as e:
         console.print(f"✗ Test failed: {e}", style="red")
         raise typer.Exit(1)
+
+
+@app.command()
+def version():
+    """Show version information."""
+    version_command()
+
+
+@app.command()  
+def languages():
+    """List supported languages and their status."""
+    languages_command()
+
+
+@app.command()
+def test(path: Optional[Path] = typer.Argument(None, help="Path to test (default: current directory)")):
+    """Test fancy_tree functionality on a directory."""
+    test_command(path)
 
 
 if __name__ == "__main__":
