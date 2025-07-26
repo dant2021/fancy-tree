@@ -105,8 +105,8 @@ class EnhancedTreeFormatter:
         """File header + its symbols (exactly what you already had)."""
         indent = self._indent(depth)
         filename = Path(file_info.path).name
-        tag = "[SIG]" if file_info.has_signature_support else "[FILE]"
-        lines.append(f"{indent}{tag} {filename} ({file_info.language}, "
+        # tag = "[SIG]" if file_info.has_signature_support else "[FILE]" removed sig and file tag
+        lines.append(f"{indent}{filename} ({file_info.language}, "
                      f"{file_info.lines} lines)")
 
         for sym in file_info.symbols:
@@ -122,7 +122,8 @@ class EnhancedTreeFormatter:
             symbol_line = f"{prefix}{symbol.name}"
         
         # Add line number
-        symbol_line += f"  # line {symbol.line}"
+        # symbol_line += f"  # line {symbol.line}"
+        symbol_line = symbol.signature
         
         lines.append(self._indent(depth) + symbol_line)
         
