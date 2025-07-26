@@ -64,6 +64,7 @@ class FileInfo:
 class DirectoryInfo:
     """Directory information with enhanced metadata."""
     path: str
+    name: str = ""  # Directory name
     files: List[FileInfo] = field(default_factory=list)
     subdirs: List['DirectoryInfo'] = field(default_factory=list)
     language_counts: Dict[str, int] = field(default_factory=dict)  # NEW: Language breakdown
@@ -71,6 +72,7 @@ class DirectoryInfo:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "path": self.path,
+            "name": self.name,
             "files": [f.to_dict() for f in self.files],
             "subdirs": [d.to_dict() for d in self.subdirs],
             "language_counts": self.language_counts

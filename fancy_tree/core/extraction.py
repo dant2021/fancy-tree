@@ -200,6 +200,27 @@ def process_file(file_path: Path, language: str) -> FileInfo:
     )
 
 
+def _get_or_create_dir(root: DirectoryInfo, parts: list[str]) -> DirectoryInfo:
+    """
+    Walk / create sub‑DirectoryInfo objects for the given relative‑path parts
+    and return the deepest DirectoryInfo.
+    """
+    current = root
+    for part in parts:
+        # look for an existing sub‑dir with this name
+        sub = next((d for d in current.subdirs if d.name == part), None)
+        if sub is None:
+            sub = DirectoryInfo(
+                path=str(Path(current.path) / part),
+                name=part,
+                subdirs=[],
+                files=[]
+            )
+            current.subdirs.append(sub)
+        current = sub
+    return current
+
+
 def process_repository(repo_path: Path, 
                       language_filter: Optional[List[str]] = None,
                       max_files: Optional[int] = None) -> RepoSummary:
@@ -218,7 +239,12 @@ def process_repository(repo_path: Path,
     availability = show_language_status_and_install(repo_path)
     
     # Build repository structure
-    root_dir = DirectoryInfo(path=".")
+    root_dir = DirectoryInfo(
+        path=".",
+        name=".",
+        subdirs=[],
+        files=[]
+    )
     
     # Process files by language
     supported_languages = {}
@@ -243,12 +269,16 @@ def process_repository(repo_path: Path,
                 except ValueError:
                     # Fallback if paths are incompatible
                     rel_path = file_path.name
+                
                 file_info = process_file(file_path, language)
                 file_info.path = str(rel_path)
                 
-                # For now, add all files to root directory
-                # TODO: Build proper directory tree in Phase 4
-                root_dir.files.append(file_info)
+                # Build proper directory tree
+                rel_parts = list(rel_path.parts)           # e.g. ['src', 'main', 'App.java']
+                file_name = rel_parts.pop()                # keep the filename, pop directories
+                target_dir = _get_or_create_dir(root_dir, rel_parts)
+                target_dir.files.append(file_info)
+                
                 total_processed += 1
                 
             except Exception as e:

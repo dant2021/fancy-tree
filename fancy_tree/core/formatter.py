@@ -1,7 +1,9 @@
 """Enhanced formatting for multi-language repository output."""
 
 from typing import List, Dict
+from pathlib import Path
 from ..schema import RepoSummary, DirectoryInfo, FileInfo, Symbol, SymbolType
+from collections import defaultdict
 
 
 class EnhancedTreeFormatter:
@@ -37,14 +39,25 @@ class EnhancedTreeFormatter:
     def _format_by_language(self, repo_summary: RepoSummary) -> List[str]:
         """Format grouped by language."""
         lines = []
+
+        files_by_language = defaultdict(list)
+
+        # walk the whole tree
+        def walk(dir_info):
+            for f in dir_info.files:
+                files_by_language[f.language].append(f)
+            for sub in dir_info.subdirs:
+                walk(sub)
+
+        walk(repo_summary.structure)
         
-        # Group files by language
-        files_by_language = {}
-        for file_info in repo_summary.structure.files:
-            lang = file_info.language
-            if lang not in files_by_language:
-                files_by_language[lang] = []
-            files_by_language[lang].append(file_info)
+        # # Group files by language
+        # files_by_language = {}
+        # for file_info in repo_summary.structure.files:
+        #     lang = file_info.language
+        #     if lang not in files_by_language:
+        #         files_by_language[lang] = []
+        #     files_by_language[lang].append(file_info)
         
         # Format each language group
         for language in sorted(files_by_language.keys()):
@@ -69,33 +82,35 @@ class EnhancedTreeFormatter:
         self._format_directory(repo_summary.structure, lines, 0)
         return lines
     
-    def _format_directory(self, dir_info: DirectoryInfo, lines: List[str], depth: int):
-        """Format directory structure."""
-        # Sort files by language, then by name
-        sorted_files = sorted(dir_info.files, key=lambda f: (f.language, f.path))
-        
-        for file_info in sorted_files:
-            self._format_file(file_info, lines, depth)
-        
-        # Format subdirectories
-        sorted_subdirs = sorted(dir_info.subdirs, key=lambda d: d.path)
-        for subdir in sorted_subdirs:
-            dir_name = subdir.path.split('/')[-1] if '/' in subdir.path else subdir.path
-            lines.append(self._indent(depth) + f"[DIR] {dir_name}/")
-            self._format_directory(subdir, lines, depth + 1)
+    def _format_directory(self,
+                          dir_info: DirectoryInfo,
+                          lines: List[str],
+                          depth: int) -> None:
+        """Recursive directory formatter (files first, then sub‑dirs)."""
+        indent = self._indent(depth)
+
+        # 1. print files in this dir
+        for f in sorted(dir_info.files, key=lambda f: f.path):
+            self._format_file(f, lines, depth)
+
+        # 2. print sub‑directories
+        for sub in sorted(dir_info.subdirs, key=lambda d: d.name.lower()):
+            lines.append(f"{indent}{sub.name}/")              # <-- directory header
+            self._format_directory(sub, lines, depth + 1)     # recurse
     
-    def _format_file(self, file_info: FileInfo, lines: List[str], depth: int):
-        """Format a single file with enhanced language info."""
-        # File header with language and signature support
-        filename = file_info.path.split('/')[-1] if '/' in file_info.path else file_info.path
-        support_indicator = "[SIG]" if file_info.has_signature_support else "[FILE]"
-        
-        file_line = f"{support_indicator} {filename} ({file_info.language}, {file_info.lines} lines)"
-        lines.append(self._indent(depth) + file_line)
-        
-        # Format symbols
-        for symbol in file_info.symbols:
-            self._format_symbol(symbol, lines, depth + 1)
+    def _format_file(self,
+                     file_info: FileInfo,
+                     lines: List[str],
+                     depth: int) -> None:
+        """File header + its symbols (exactly what you already had)."""
+        indent = self._indent(depth)
+        filename = Path(file_info.path).name
+        # tag = "[SIG]" if file_info.has_signature_support else "[FILE]" removed sig and file tag
+        lines.append(f"{indent}{filename} ({file_info.language}, "
+                     f"{file_info.lines} lines)")
+
+        for sym in file_info.symbols:
+            self._format_symbol(sym, lines, depth + 1)
     
     def _format_symbol(self, symbol: Symbol, lines: List[str], depth: int):
         """Format symbol with enhanced signature display."""
@@ -106,8 +121,8 @@ class EnhancedTreeFormatter:
             prefix = self._get_symbol_prefix(symbol.type)
             symbol_line = f"{prefix}{symbol.name}"
         
-        # Add line number
-        symbol_line += f"  # line {symbol.line}"
+        # Remove line number from pretty output (kept in JSON)
+        # symbol_line += f"  # line {symbol.line}"
         
         lines.append(self._indent(depth) + symbol_line)
         
