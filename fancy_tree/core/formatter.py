@@ -51,14 +51,6 @@ class EnhancedTreeFormatter:
 
         walk(repo_summary.structure)
         
-        # # Group files by language
-        # files_by_language = {}
-        # for file_info in repo_summary.structure.files:
-        #     lang = file_info.language
-        #     if lang not in files_by_language:
-        #         files_by_language[lang] = []
-        #     files_by_language[lang].append(file_info)
-        
         # Format each language group
         for language in sorted(files_by_language.keys()):
             files = files_by_language[language]
@@ -66,48 +58,57 @@ class EnhancedTreeFormatter:
             
             lines.append(f"{language.upper()} Files ({len(files)} files, {support_status}):")
             
-            # Sort files within language
-            sorted_files = sorted(files, key=lambda f: f.path)
-            
-            for file_info in sorted_files:
+            # Keep natural file ordering - remove sorted()
+            for file_info in files:
                 self._format_file(file_info, lines, 1)
             
             lines.append("")  # Empty line between languages
         
         return lines
-    
+        
     def _format_by_structure(self, repo_summary: RepoSummary) -> List[str]:
         """Format by directory structure (future implementation)."""
         lines = []
         self._format_directory(repo_summary.structure, lines, 0)
         return lines
     
-    def _format_directory(self,
-                          dir_info: DirectoryInfo,
-                          lines: List[str],
-                          depth: int) -> None:
-        """Recursive directory formatter (files first, then sub‑dirs)."""
+    def _format_directory(
+        self,
+        dir_info: DirectoryInfo,
+        lines: list[str],
+        depth: int
+    ) -> None:
         indent = self._indent(depth)
 
-        # 1. print files in this dir
-        for f in sorted(dir_info.files, key=lambda f: f.path):
+        # sort once, case‑insensitive – this is exactly what `tree` does
+        subdirs = sorted(dir_info.subdirs, key=lambda d: d.name.lower())
+        files   = sorted(dir_info.files,   key=lambda f: Path(f.path).name.lower())
+
+        # ── 1. directories first ─────────────────────────────
+        for sub in subdirs:
+            lines.append(f"{indent}{sub.name}/")
+            self._format_directory(sub, lines, depth + 1)
+
+        # ── 2. files afterwards ─────────────────────────────
+        for f in files:
             self._format_file(f, lines, depth)
 
-        # 2. print sub‑directories
-        for sub in sorted(dir_info.subdirs, key=lambda d: d.name.lower()):
-            lines.append(f"{indent}{sub.name}/")              # <-- directory header
-            self._format_directory(sub, lines, depth + 1)     # recurse
     
     def _format_file(self,
-                     file_info: FileInfo,
-                     lines: List[str],
-                     depth: int) -> None:
+                    file_info: FileInfo,
+                    lines: List[str],
+                    depth: int) -> None:
         """File header + its symbols (exactly what you already had)."""
         indent = self._indent(depth)
         filename = Path(file_info.path).name
-        # tag = "[SIG]" if file_info.has_signature_support else "[FILE]" removed sig and file tag
+        
+        # If the file has no symbols we treat it as a generic asset.
+        if not file_info.symbols:
+            lines.append(f"{indent}{filename}")
+            return
+
         lines.append(f"{indent}{filename} ({file_info.language}, "
-                     f"{file_info.lines} lines)")
+                    f"{file_info.lines} lines)")
 
         for sym in file_info.symbols:
             self._format_symbol(sym, lines, depth + 1)

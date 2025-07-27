@@ -246,11 +246,21 @@ def process_repository(repo_path: Path,
         files=[]
     )
     
+    # Get classified files and find unclassified ones
+    classified_files = scan_results["classified_files"]
+    all_files = scan_results["files"]
+    
+    # Find unclassified files by comparing all files with classified files
+    classified_file_set = set()
+    for file_list in classified_files.values():
+        classified_file_set.update(file_list)
+    unclassified_files = [f for f in all_files if f not in classified_file_set]
+    
     # Process files by language
     supported_languages = {}
     total_processed = 0
     
-    for language, file_list in scan_results["classified_files"].items():
+    for language, file_list in classified_files.items():
         console.print(f"Processing {len(file_list)} {language} files...")
         
         # Check if language is supported
@@ -284,6 +294,30 @@ def process_repository(repo_path: Path,
             except Exception as e:
                 console.print(f"ERROR: Error processing {file_path}: {e}")
                 continue
+    
+    # ----------------------------------------------------------
+    # Attach files that didn't match any language
+    # ----------------------------------------------------------
+    for file_path in unclassified_files:
+        try:
+            rel_path = file_path.resolve().relative_to(repo_path.resolve())
+        except ValueError:
+            rel_path = file_path.name
+
+        # no symbols, no lines, no language
+        file_info = FileInfo(
+            path=str(rel_path),
+            language="other",
+            lines=0,
+            symbols=[],
+            has_signature_support=False
+        )
+
+        parts = list(rel_path.parts)
+        if parts:
+            parts.pop()                                   # drop the filename
+        _get_or_create_dir(root_dir, parts).files.append(file_info)
+        total_processed += 1
     
     console.print(f"Processed {total_processed} files")
     

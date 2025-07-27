@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Tuple, Union
 from rich.console import Console
 
 from .config import detect_language, config_manager
@@ -91,7 +91,11 @@ def _get_filesystem_files(repo_path: Path) -> List[Path]:
     return files
 
 
-def classify_files(files: List[Path]) -> Dict[str, List[Path]]:
+def classify_files(
+    files: List[Path], 
+    *, 
+    return_unclassified: bool = False
+) -> Union[Tuple[Dict[str, List[Path]], List[Path]], Dict[str, List[Path]]]:
     """Group files by detected language."""
     classified = {}
     unclassified = []
@@ -113,8 +117,9 @@ def classify_files(files: List[Path]) -> Dict[str, List[Path]]:
     for language, lang_files in classified.items():
         console.print(f"  {language}: {len(lang_files)} files")
     
+    if return_unclassified:
+        return classified, unclassified
     return classified
-
 
 def count_lines(file_path: Path) -> int:
     """Count lines in a file safely."""
