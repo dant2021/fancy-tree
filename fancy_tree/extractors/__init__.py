@@ -4,6 +4,7 @@ from .base import SignatureExtractor, register_extractor, get_signature_extracto
 from .python import PythonExtractor
 from .typescript import TypeScriptExtractor
 from .java import JavaExtractor
+from .go import GoExtractor
 
 # Register all available extractors
 def initialize_extractors():
@@ -11,6 +12,7 @@ def initialize_extractors():
     register_extractor("python", PythonExtractor())
     register_extractor("typescript", TypeScriptExtractor())
     register_extractor("java", JavaExtractor())
+    register_extractor("go",     GoExtractor())
 
 # Auto-initialize when module is imported
 initialize_extractors()
