@@ -22,9 +22,19 @@ class SignatureExtractor(ABC):
         """Extract method signature (defaults to function signature)."""
         return self.extract_function_signature(node, source_code, template)
     
-    def get_node_text(self, node: Node, source_code: str) -> str:
-        """Helper to extract text from a tree-sitter node."""
-        return source_code[node.start_byte:node.end_byte]
+    def get_node_text(self, node: Node, source_code: str | bytes) -> str:
+        """
+        Return the exact source substring represented by *node*.
+
+        Tree-sitter reports byte offsets, therefore we must index the UTF-8
+        encoded byte array, not the Python ``str``.
+        """
+        if isinstance(source_code, str):
+            source_bytes = source_code.encode("utf-8")
+        else:
+            source_bytes = source_code
+
+        return source_bytes[node.start_byte:node.end_byte].decode("utf-8")
     
     def find_child_by_type(self, node: Node, node_type: str) -> Optional[Node]:
         """Helper to find first child node of specific type."""
