@@ -12,7 +12,12 @@ from rich.panel import Panel
 from .core.extraction import process_repository
 from .core.formatter import format_repository_tree
 
-app = typer.Typer(name="fancy-tree", help="Git-enabled, cross-language code analysis with tree-sitter")
+app = typer.Typer(
+    name="fancy-tree",
+    help="Git-enabled, cross-language code analysis with tree-sitter",
+    add_completion=False,                      # 1️⃣ hide completion options
+    context_settings={"allow_interspersed_args": True}  # 2️⃣ let options appear after path
+)
 console = Console()
 
 # Define subcommand names to avoid treating them as paths
@@ -26,7 +31,7 @@ def main(
     languages: Optional[List[str]] = typer.Option(None, "--lang", "-l", help="Filter by specific languages"),
     max_files: Optional[int] = typer.Option(None, "--max-files", "-m", help="Maximum number of files to process"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path (default: stdout)"),
-    json_output: bool = typer.Option(False, "--json", help="Output in JSON format"),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output in JSON format"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output"),
 ):
     """Git-enabled, cross-language code analysis with tree-sitter.
