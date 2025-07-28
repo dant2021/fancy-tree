@@ -4,7 +4,7 @@ A git-aware `tree` command that looks inside your files and shows functions, cla
 
 ```bash
 pip install fancy-tree
-fancy-tree scan my-project/
+fancy-tree my-project/
 ```
 
 ## What It Does
@@ -18,16 +18,16 @@ It's the `tree` command, but now it can:
 
 ```bash
 # Scan current directory
-fancy-tree scan .
+fancy-tree .
 
 # Scan specific project  
-fancy-tree scan /path/to/your/project
+fancy-tree /path/to/your/project
 
 # Filter by languages
-fancy-tree scan . --lang python javascript
+fancy-tree . --lang python javascript
 
 # Limit files (for large repos)
-fancy-tree scan . --max-files 50
+fancy-tree . --max-files 50
 ```
 
 ## Sample Output
@@ -38,14 +38,14 @@ Total files: 42, Total lines: 3,847
 PYTHON Files (15 files, SUPPORTED):
 [FILE] user_service.py (python, 156 lines)
   class UserService:
-    def create_user(self, name: str, email: str) -> User # line 23
-    def delete_user(self, user_id: int) -> bool # line 45
-    def validate_email(email: str) -> bool # line 67
+    def create_user(self, name: str, email: str) -> User 
+    def delete_user(self, user_id: int) -> bool 
+    def validate_email(email: str) -> bool 
 
 TYPESCRIPT Files (8 files, SUPPORTED):
 [FILE] Button.tsx (typescript, 89 lines)
-interface ButtonProps # line 5
-function Button(props: ButtonProps): JSX.Element # line 12
+interface ButtonProps 
+function Button(props: ButtonProps): JSX.Element
 ```
 ## Contributing
 
