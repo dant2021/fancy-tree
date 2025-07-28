@@ -29,7 +29,8 @@ def main(
     ctx: typer.Context,
     path: Optional[Path] = typer.Argument(None, help="Repository path to scan (default: current directory)"),
     languages: Optional[List[str]] = typer.Option(None, "--lang", "-l", help="Filter by specific languages"),
-    max_files: Optional[int] = typer.Option(None, "--max-files", "-m", help="Maximum number of files to process"),
+    max_files: Optional[int] = typer.Option(100, "--max-files", "-m", help="Maximum number of files to process"),
+    max_lines: Optional[int] = typer.Option(25, "--max-lines", help="Maximum number of lines for a file"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path (default: stdout)"),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output in JSON format"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output"),
@@ -77,7 +78,8 @@ def main(
         repo_summary = process_repository(
             repo_path=path,
             language_filter=languages,
-            max_files=max_files
+            max_files=max_files,
+            max_lines=max_lines
         )
         
         # Format output - always group by structure now

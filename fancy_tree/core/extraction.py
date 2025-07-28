@@ -181,10 +181,42 @@ def extract_symbols_from_file(file_path: Path, language: str) -> List[Symbol]:
         return []
 
 
-def process_file(file_path: Path, language: str) -> FileInfo:
+def count_symbol_output_lines(symbols: List[Symbol]) -> int:
+    """Count how many lines these symbols would produce in the output."""
+    count = 0
+    for symbol in symbols:
+        count += 1  # The symbol itself
+        count += count_symbol_output_lines(symbol.children)  # Recursively count children
+    return count
+
+
+def flatten_to_top_level(symbols: List[Symbol]) -> List[Symbol]:
+    """Return only top-level symbols, removing all children."""
+    flattened = []
+    for symbol in symbols:
+        # Create a copy of the symbol without children
+        top_level_symbol = Symbol(
+            name=symbol.name,
+            type=symbol.type,
+            line=symbol.line,
+            signature=symbol.signature,
+            language=symbol.language,
+            children=[]  # Remove all children
+        )
+        flattened.append(top_level_symbol)
+    return flattened
+
+
+def process_file(file_path: Path, language: str, max_lines: Optional[int] = 25) -> FileInfo:
     """Process a single file and return FileInfo."""
     symbols = extract_symbols_from_file(file_path, language)
     lines = count_lines(file_path)
+    
+    # Check if the output would be too long
+    output_lines = count_symbol_output_lines(symbols)
+    if output_lines > max_lines:
+        # Flatten to only top-level symbols
+        symbols = flatten_to_top_level(symbols)
     
     # Check if language has signature support
     config = get_language_config(language)
@@ -223,7 +255,8 @@ def _get_or_create_dir(root: DirectoryInfo, parts: list[str]) -> DirectoryInfo:
 
 def process_repository(repo_path: Path, 
                       language_filter: Optional[List[str]] = None,
-                      max_files: Optional[int] = None) -> RepoSummary:
+                      max_files: Optional[int] = None,
+                      max_lines: Optional[int] = 25) -> RepoSummary:
     """
     Main orchestration function - processes entire repository.
     
@@ -280,7 +313,7 @@ def process_repository(repo_path: Path,
                     # Fallback if paths are incompatible
                     rel_path = file_path.name
                 
-                file_info = process_file(file_path, language)
+                file_info = process_file(file_path, language, max_lines)
                 file_info.path = str(rel_path)
                 
                 # Build proper directory tree
