@@ -71,8 +71,8 @@ This project is **work in progress** and we'd love your help! Adding language su
 
 ## Language Support
 
-**Good**: Python, TypeScript, Java  
-**Basic**: JavaScript, Go, Rust, C++  
+**Good**: Python, TypeScript, Java, Go  
+**Basic**: JavaScript, Rust, Php, Ruby, C++, C, Csharp  
 **Minimal**: 160+ more languages
 
 *Want better support for your language? Contribute an extractor!*
