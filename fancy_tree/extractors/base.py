@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from tree_sitter import Node
-
+from typing import Union
 
 class SignatureExtractor(ABC):
     """Abstract base class for language-specific signature extractors."""
@@ -21,8 +21,8 @@ class SignatureExtractor(ABC):
     def extract_method_signature(self, node: Node, source_code: str, template: str) -> str:
         """Extract method signature (defaults to function signature)."""
         return self.extract_function_signature(node, source_code, template)
-    
-    def get_node_text(self, node: Node, source_code: str | bytes) -> str:
+
+    def get_node_text(self, node: Node, source_code: Union[str, bytes]) -> str:
         """
         Return the exact source substring represented by *node*.
 
