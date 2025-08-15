@@ -122,14 +122,36 @@ class EnhancedTreeFormatter:
             prefix = self._get_symbol_prefix(symbol.type)
             symbol_line = f"{prefix}{symbol.name}"
         
+        # Fix multiline indentation
+        base_indent = self._indent(depth)
+        symbol_line = self._fix_multiline_indentation(symbol_line, base_indent)
+        
         # Remove line number from pretty output (kept in JSON)
         # symbol_line += f"  # line {symbol.line}"
         
-        lines.append(self._indent(depth) + symbol_line)
+        lines.append(base_indent + symbol_line)
         
         # Format child symbols
         for child in symbol.children:
             self._format_symbol(child, lines, depth + 1)
+
+    def _fix_multiline_indentation(self, signature: str, base_indent: str) -> str:
+        """Fix multiline signature indentation to maintain minimum base indentation."""
+        if '\n' not in signature:
+            return signature
+        
+        lines = signature.split('\n')
+        result_lines = [lines[0]]  # First line stays as-is
+        
+        for line in lines[1:]:
+            stripped = line.lstrip()
+            if stripped:  # Non-empty line
+                # Ensure minimum indentation matches base_indent
+                result_lines.append(base_indent + stripped)
+            else:
+                result_lines.append('')  # Keep empty lines
+        
+        return '\n'.join(result_lines)
     
     def _get_symbol_prefix(self, symbol_type: SymbolType) -> str:
         """Get prefix for different symbol types."""
