@@ -51,11 +51,11 @@ def _get_git_files(repo_path: Path) -> Optional[List[Path]]:
                     file_path = repo_path / file_line.strip()
                     if file_path.exists() and file_path.is_file():
                         files.append(file_path)
-            return files
+            return files if files else None
         else:
             console.print(f"Git command failed: {result.stderr}")
             return None
-            
+
     except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError) as e:
         console.print(f"Git not available: {e}")
         return None
