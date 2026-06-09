@@ -34,11 +34,11 @@ class CsharpExtractor(SignatureExtractor):
         if visibility:
             parts.append(visibility)
         
-        if node.type == "class_declaration":
+        if self.node_type(node) == "class_declaration":
             parts.append("class")
-        elif node.type == "interface_declaration":
+        elif self.node_type(node) == "interface_declaration":
             parts.append("interface")
-        elif node.type == "struct_declaration":
+        elif self.node_type(node) == "struct_declaration":
             parts.append("struct")
         
         parts.append(name)
@@ -52,7 +52,7 @@ class CsharpExtractor(SignatureExtractor):
         """Extract visibility modifier."""
         modifiers = self.find_child_by_type(node, "modifiers")
         if modifiers:
-            for child in modifiers.children:
+            for child in self.node_children(modifiers):
                 text = self.get_node_text(child, source_code)
                 if text in ["public", "private", "protected", "internal"]:
                     return text
@@ -83,8 +83,8 @@ class CsharpExtractor(SignatureExtractor):
     def _get_return_type(self, node: Node, source_code: str) -> Optional[str]:
         """Extract return type."""
         # Look for type before the method name
-        for child in node.children:
-            if child.type in ["predefined_type", "identifier", "generic_name"]:
+        for child in self.node_children(node):
+            if self.node_type(child) in ["predefined_type", "identifier", "generic_name"]:
                 return self.get_node_text(child, source_code)
         return None
     
@@ -93,8 +93,8 @@ class CsharpExtractor(SignatureExtractor):
         base_list = self.find_child_by_type(node, "base_list")
         if base_list:
             bases = []
-            for child in base_list.children:
-                if child.type == "identifier":
+            for child in self.node_children(base_list):
+                if self.node_type(child) == "identifier":
                     bases.append(self.get_node_text(child, source_code))
             return ", ".join(bases) if bases else None
         return None

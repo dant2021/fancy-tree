@@ -23,12 +23,12 @@ class RubyExtractor(SignatureExtractor):
         name = self._get_name(node, source_code)
         inheritance = self._get_inheritance(node, source_code)
         
-        if node.type == "class":
+        if self.node_type(node) == "class":
             if inheritance:
                 return f"class {name} < {inheritance}"
             else:
                 return f"class {name}"
-        elif node.type == "module":
+        elif self.node_type(node) == "module":
             return f"module {name}"
         else:
             return f"class {name}"
@@ -64,4 +64,4 @@ class RubyExtractor(SignatureExtractor):
             constant = self.find_child_by_type(superclass, "constant")
             if constant:
                 return self.get_node_text(constant, source_code)
-        return None 
+        return None

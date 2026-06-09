@@ -124,6 +124,25 @@ class ConfigManager:
                         extensions.add(ext)
         
         return extensions
+
+    def _is_parser_available(self, lang_name: str, lang_config: LanguageConfig) -> bool:
+        """Check parser availability through language-pack first, then legacy packages."""
+        try:
+            from tree_sitter_language_pack import get_parser
+
+            get_parser(lang_name)
+            return True
+        except Exception:
+            pass
+
+        package_name = lang_config.tree_sitter_package
+        module_name = package_name.replace('-', '_')
+
+        try:
+            __import__(module_name)
+            return True
+        except ImportError:
+            return False
     
     def detect_available_languages(self, repo_path: Path) -> Dict[str, Dict[str, Any]]:
         """Detect which languages exist in repo and which parsers are available."""
@@ -136,15 +155,9 @@ class ConfigManager:
             has_files = any(ext in file_extensions for ext in lang_config.extensions)
             
             if has_files:
-                # Check if tree-sitter package is available
+                # Check if tree-sitter parser is available
                 package_name = lang_config.tree_sitter_package
-                module_name = package_name.replace('-', '_')
-                
-                try:
-                    __import__(module_name)
-                    parser_available = True
-                except ImportError:
-                    parser_available = False
+                parser_available = self._is_parser_available(lang_name, lang_config)
                 
                 language_availability[lang_name] = {
                     "has_files": has_files,

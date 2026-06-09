@@ -1,5 +1,7 @@
 """Generic symbol extraction using tree-sitter and language configurations."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from rich.console import Console
@@ -15,6 +17,75 @@ console = Console()
 
 # Parser cache to avoid recreating parsers
 _parser_cache: Dict[str, Optional[Parser]] = {}
+
+
+def parse_tree(parser: Parser, source_code: str):
+    """Parse source across tree-sitter APIs that accept either str or bytes."""
+    try:
+        return parser.parse(source_code)
+    except TypeError:
+        return parser.parse(source_code.encode("utf-8"))
+
+
+def root_node(tree):
+    """Return the root node across property and callable root_node APIs."""
+    root = tree.root_node
+    return root() if callable(root) else root
+
+
+def node_type(node) -> str:
+    """Return the node kind across tree-sitter Node API versions."""
+    node_kind = getattr(node, "type", None)
+    if node_kind is None:
+        node_kind = node.kind
+    if callable(node_kind):
+        node_kind = node_kind()
+    return node_kind
+
+
+def node_children(node) -> list:
+    """Return child nodes across sequence and child_count/child APIs."""
+    children = getattr(node, "children", None)
+    if callable(children):
+        children = children()
+    if children is not None:
+        return children
+    child_count = node.child_count
+    if callable(child_count):
+        child_count = child_count()
+    return [node.child(i) for i in range(child_count)]
+
+
+def node_start_line(node) -> int:
+    """Return the 1-based start line across point/position APIs."""
+    point = getattr(node, "start_point", None)
+    if callable(point):
+        point = point()
+    if point is None:
+        point = node.start_position
+    if callable(point):
+        point = point()
+    if hasattr(point, "row"):
+        return point.row + 1
+    return point[0] + 1
+
+
+def node_start_byte(node) -> int:
+    """Return the start byte across property and callable APIs."""
+    start_byte = node.start_byte
+    return start_byte() if callable(start_byte) else start_byte
+
+
+def node_end_byte(node) -> int:
+    """Return the end byte across property and callable APIs."""
+    end_byte = node.end_byte
+    return end_byte() if callable(end_byte) else end_byte
+
+
+def node_text(node, source_code: str) -> str:
+    """Return node text by slicing UTF-8 bytes with tree-sitter byte offsets."""
+    source_bytes = source_code.encode("utf-8")
+    return source_bytes[node_start_byte(node):node_end_byte(node)].decode("utf-8")
 
 
 def get_parser_for_language(language: str) -> Optional[Parser]:
@@ -50,8 +121,7 @@ def extract_symbols_generic(source_code: str, language: str) -> List[Symbol]:
     extractor = get_signature_extractor(language)
     
     # Parse source
-    source_bytes = bytes(source_code, "utf8")
-    tree = parser.parse(source_bytes)
+    tree = parse_tree(parser, source_code)
     symbols = []
     
     def visit_node(node, parent_symbols=None, inside_class=False):
@@ -59,28 +129,30 @@ def extract_symbols_generic(source_code: str, language: str) -> List[Symbol]:
             parent_symbols = symbols
         
         # Use configuration to check node types
-        if node.type in config.class_nodes:
+        current_type = node_type(node)
+
+        if current_type in config.class_nodes:
             class_symbol = _extract_class_symbol(node, source_code, config, extractor, language)
             if class_symbol:
                 parent_symbols.append(class_symbol)
                 # Recurse with class_symbol.children as parent
-                for child in node.children:
+                for child in node_children(node):
                     visit_node(child, class_symbol.children, inside_class=True)
         
-        elif node.type in config.function_nodes:
+        elif current_type in config.function_nodes:
             function_symbol = _extract_function_symbol(node, source_code, config, extractor, language, inside_class)
             if function_symbol:
                 parent_symbols.append(function_symbol)
                 # Recurse with function_symbol.children as parent
-                for child in node.children:
+                for child in node_children(node):
                     visit_node(child, function_symbol.children, inside_class)
         
         else:
             # Continue traversing with same parent_symbols
-            for child in node.children:
+            for child in node_children(node):
                 visit_node(child, parent_symbols, inside_class)
     
-    visit_node(tree.root_node)
+    visit_node(root_node(tree))
     return symbols
 
 
@@ -101,7 +173,7 @@ def _extract_class_symbol(node, source_code: str, config, extractor, language: s
     return Symbol(
         name=name,
         type=SymbolType.CLASS,
-        line=node.start_point[0] + 1,
+        line=node_start_line(node),
         signature=signature,
         language=language
     )
@@ -123,7 +195,7 @@ def _extract_interface_symbol(node, source_code: str, config, extractor, languag
     return Symbol(
         name=name,
         type=SymbolType.INTERFACE,
-        line=node.start_point[0] + 1,
+        line=node_start_line(node),
         signature=signature,
         language=language
     )
@@ -153,7 +225,7 @@ def _extract_function_symbol(node, source_code: str, config, extractor, language
     return Symbol(
         name=name,
         type=symbol_type,
-        line=node.start_point[0] + 1,
+        line=node_start_line(node),
         signature=signature,
         language=language
     )
@@ -161,9 +233,9 @@ def _extract_function_symbol(node, source_code: str, config, extractor, language
 
 def _extract_name_from_node(node, source_code: str, config) -> Optional[str]:
     """Extract name from node using configured name node types."""
-    for child in node.children:
-        if child.type in config.name_nodes:
-            return source_code[child.start_byte:child.end_byte]
+    for child in node_children(node):
+        if node_type(child) in config.name_nodes:
+            return node_text(child, source_code)
     
     return None
 
@@ -311,7 +383,7 @@ def process_repository(repo_path: Path,
                     rel_path = abs_file.relative_to(abs_repo)
                 except ValueError:
                     # Fallback if paths are incompatible
-                    rel_path = file_path.name
+                    rel_path = Path(file_path.name)
                 
                 file_info = process_file(file_path, language, max_lines)
                 file_info.path = str(rel_path)
@@ -335,7 +407,7 @@ def process_repository(repo_path: Path,
         try:
             rel_path = file_path.resolve().relative_to(repo_path.resolve())
         except ValueError:
-            rel_path = file_path.name
+            rel_path = Path(file_path.name)
 
         # no symbols, no lines, no language
         file_info = FileInfo(

@@ -52,8 +52,8 @@ class PythonExtractor(SignatureExtractor):
     
     def _get_return_type(self, node: Node, source_code: str) -> Optional[str]:
         """Extract return type annotation if present."""
-        for child in node.children:
-            if child.type == "type":
+        for child in self.node_children(node):
+            if self.node_type(child) == "type":
                 return self.get_node_text(child, source_code)
         return None
     
@@ -62,4 +62,4 @@ class PythonExtractor(SignatureExtractor):
         argument_list = self.find_child_by_type(node, "argument_list")
         if argument_list:
             return self.get_node_text(argument_list, source_code).strip("()")
-        return None 
+        return None

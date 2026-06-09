@@ -24,24 +24,24 @@ class CppExtractor(SignatureExtractor):
         name = self._get_class_name(node, source_code)
         inheritance = self._get_inheritance(node, source_code)
         
-        if node.type == "class_specifier":
+        if self.node_type(node) == "class_specifier":
             if inheritance:
                 return f"class {name} : {inheritance}"
             else:
                 return f"class {name}"
-        elif node.type == "struct_specifier":
+        elif self.node_type(node) == "struct_specifier":
             if inheritance:
                 return f"struct {name} : {inheritance}"
             else:
                 return f"struct {name}"
-        elif node.type == "enum_specifier":
+        elif self.node_type(node) == "enum_specifier":
             return f"enum {name}"
         else:
             return f"type {name}"
     
     def _get_function_name(self, node: Node, source_code: str) -> str:
         """Extract function name."""
-        if node.type == "function_definition":
+        if self.node_type(node) == "function_definition":
             declarator = self.find_child_by_type(node, "function_declarator")
             if declarator:
                 identifier = self.find_child_by_type(declarator, "identifier")
@@ -73,9 +73,10 @@ class CppExtractor(SignatureExtractor):
     
     def _get_return_type(self, node: Node, source_code: str) -> Optional[str]:
         """Extract return type."""
-        if node.type == "function_definition" and node.children:
-            first_child = node.children[0]
-            if first_child.type != "function_declarator":
+        children = self.node_children(node)
+        if self.node_type(node) == "function_definition" and children:
+            first_child = children[0]
+            if self.node_type(first_child) != "function_declarator":
                 return self.get_node_text(first_child, source_code)
         return None
     
@@ -85,8 +86,8 @@ class CppExtractor(SignatureExtractor):
         if base_class_clause:
             # Get all base classes
             bases = []
-            for child in base_class_clause.children:
-                if child.type == "type_identifier":
+            for child in self.node_children(base_class_clause):
+                if self.node_type(child) == "type_identifier":
                     bases.append(self.get_node_text(child, source_code))
             return ", ".join(bases) if bases else None
-        return None 
+        return None

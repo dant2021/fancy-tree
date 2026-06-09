@@ -41,7 +41,7 @@ class GoExtractor(SignatureExtractor):
         name  = self.get_node_text(ident, source_code)
 
         body  = self.find_child_by_type(spec, ("struct_type", "interface_type"))
-        kind  = "struct" if body and body.type == "struct_type" else "interface"
+        kind  = "struct" if body and self.node_type(body) == "struct_type" else "interface"
 
         return f"type {name} {kind}"
 

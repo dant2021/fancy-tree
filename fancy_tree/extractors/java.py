@@ -45,7 +45,7 @@ class JavaExtractor(SignatureExtractor):
         modifiers = []
         modifiers_node = self.find_child_by_type(node, "modifiers")
         if modifiers_node:
-            for child in modifiers_node.children:
+            for child in self.node_children(modifiers_node):
                 modifier_text = self.get_node_text(child, source_code)
                 modifiers.append(modifier_text)
         return " ".join(modifiers) if modifiers else None
@@ -75,8 +75,8 @@ class JavaExtractor(SignatureExtractor):
     def _get_return_type(self, node: Node, source_code: str) -> Optional[str]:
         """Extract return type."""
         # Look for type nodes
-        for child in node.children:
-            if child.type in ["type_identifier", "primitive_type", "generic_type", "array_type"]:
+        for child in self.node_children(node):
+            if self.node_type(child) in ["type_identifier", "primitive_type", "generic_type", "array_type"]:
                 return self.get_node_text(child, source_code)
         return None
     
@@ -95,10 +95,10 @@ class JavaExtractor(SignatureExtractor):
         super_interfaces = self.find_child_by_type(node, "super_interfaces")
         if super_interfaces:
             interfaces = []
-            for child in super_interfaces.children:
-                if child.type == "type_identifier":
+            for child in self.node_children(super_interfaces):
+                if self.node_type(child) == "type_identifier":
                     interfaces.append(self.get_node_text(child, source_code))
             if interfaces:
                 parts.append(f"implements {', '.join(interfaces)}")
         
-        return " ".join(parts) if parts else None 
+        return " ".join(parts) if parts else None

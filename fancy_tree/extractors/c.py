@@ -23,11 +23,11 @@ class CExtractor(SignatureExtractor):
         """Extract C struct or enum signature."""
         name = self._get_struct_name(node, source_code)
         
-        if node.type == "struct_specifier":
+        if self.node_type(node) == "struct_specifier":
             return f"struct {name}"
-        elif node.type == "union_specifier":
+        elif self.node_type(node) == "union_specifier":
             return f"union {name}"
-        elif node.type == "enum_specifier":
+        elif self.node_type(node) == "enum_specifier":
             return f"enum {name}"
         else:
             return f"type {name}"
@@ -35,7 +35,7 @@ class CExtractor(SignatureExtractor):
     def _get_function_name(self, node: Node, source_code: str) -> str:
         """Extract function name."""
         # For function_definition, look for function_declarator
-        if node.type == "function_definition":
+        if self.node_type(node) == "function_definition":
             declarator = self.find_child_by_type(node, "function_declarator")
             if declarator:
                 identifier = self.find_child_by_type(declarator, "identifier")
@@ -70,8 +70,9 @@ class CExtractor(SignatureExtractor):
     def _get_return_type(self, node: Node, source_code: str) -> Optional[str]:
         """Extract return type."""
         # For function_definition, the first child is usually the return type
-        if node.type == "function_definition" and node.children:
-            first_child = node.children[0]
-            if first_child.type != "function_declarator":
+        children = self.node_children(node)
+        if self.node_type(node) == "function_definition" and children:
+            first_child = children[0]
+            if self.node_type(first_child) != "function_declarator":
                 return self.get_node_text(first_child, source_code)
-        return None 
+        return None
