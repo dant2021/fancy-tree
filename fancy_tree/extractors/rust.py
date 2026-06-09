@@ -23,11 +23,11 @@ class RustExtractor(SignatureExtractor):
         """Extract Rust struct, trait, or impl signature."""
         name = self._get_name(node, source_code)
         
-        if node.type == "struct_item":
+        if self.node_type(node) == "struct_item":
             return f"struct {name}"
-        elif node.type == "trait_item":
+        elif self.node_type(node) == "trait_item":
             return f"trait {name}"
-        elif node.type == "impl_item":
+        elif self.node_type(node) == "impl_item":
             return f"impl {name}"
         else:
             return f"type {name}"
@@ -58,10 +58,11 @@ class RustExtractor(SignatureExtractor):
     def _get_return_type(self, node: Node, source_code: str) -> Optional[str]:
         """Extract return type."""
         # Look for -> return_type pattern
-        for child in node.children:
+        children = self.node_children(node)
+        for child in children:
             if self.get_node_text(child, source_code).strip() == "->":
                 # Next sibling should be the return type
-                next_idx = node.children.index(child) + 1
-                if next_idx < len(node.children):
-                    return self.get_node_text(node.children[next_idx], source_code)
-        return None 
+                next_idx = children.index(child) + 1
+                if next_idx < len(children):
+                    return self.get_node_text(children[next_idx], source_code)
+        return None

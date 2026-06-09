@@ -20,14 +20,14 @@ class PhpExtractor(SignatureExtractor):
         name = self._get_class_name(node, source_code)
         inheritance = self._get_inheritance(node, source_code)
         
-        if node.type == "class_declaration":
+        if self.node_type(node) == "class_declaration":
             if inheritance:
                 return f"class {name} extends {inheritance}"
             else:
                 return f"class {name}"
-        elif node.type == "interface_declaration":
+        elif self.node_type(node) == "interface_declaration":
             return f"interface {name}"
-        elif node.type == "trait_declaration":
+        elif self.node_type(node) == "trait_declaration":
             return f"trait {name}"
         else:
             return f"class {name}"
@@ -61,4 +61,4 @@ class PhpExtractor(SignatureExtractor):
             name_node = self.find_child_by_type(base_clause, "name")
             if name_node:
                 return self.get_node_text(name_node, source_code)
-        return None 
+        return None

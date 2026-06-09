@@ -13,10 +13,10 @@ class JavaScriptExtractor(SignatureExtractor):
         name = self._get_function_name(node, source_code)
         params = self._get_parameters(node, source_code)
         
-        if node.type == "method_definition":
+        if self.node_type(node) == "method_definition":
             # Method signature
             return f"{name}({params})"
-        elif node.type == "arrow_function":
+        elif self.node_type(node) == "arrow_function":
             # Arrow function - try to get name from parent assignment
             arrow_name = self._get_arrow_function_name(node, source_code)
             return f"{arrow_name} = ({params}) => {{}}"
@@ -47,7 +47,9 @@ class JavaScriptExtractor(SignatureExtractor):
         """Extract name for arrow functions from parent assignment."""
         # Check if parent is an assignment
         parent = node.parent
-        if parent and parent.type in ["assignment_expression", "variable_declarator"]:
+        if callable(parent):
+            parent = parent()
+        if parent and self.node_type(parent) in ["assignment_expression", "variable_declarator"]:
             # Look for identifier in the assignment
             identifier = self.find_child_by_type(parent, "identifier")
             if identifier:
@@ -74,10 +76,10 @@ class JavaScriptExtractor(SignatureExtractor):
         heritage_clause = self.find_child_by_type(node, "class_heritage")
         if heritage_clause:
             # Find the extends clause
-            for child in heritage_clause.children:
-                if child.type == "extends_clause":
+            for child in self.node_children(heritage_clause):
+                if self.node_type(child) == "extends_clause":
                     # Get the class being extended
                     identifier = self.find_child_by_type(child, "identifier")
                     if identifier:
                         return self.get_node_text(identifier, source_code)
-        return None 
+        return None

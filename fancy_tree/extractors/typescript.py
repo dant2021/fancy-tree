@@ -14,7 +14,7 @@ class TypeScriptExtractor(SignatureExtractor):
         params = self._get_parameters(node, source_code)
         return_type = self._get_return_type(node, source_code)
         
-        if node.type == "method_definition":
+        if self.node_type(node) == "method_definition":
             # Method signature
             if return_type:
                 return f"{name}({params}): {return_type}"
@@ -31,7 +31,7 @@ class TypeScriptExtractor(SignatureExtractor):
         """Extract TypeScript class or interface signature."""
         name = self._get_class_name(node, source_code)
         
-        if node.type == "interface_declaration":
+        if self.node_type(node) == "interface_declaration":
             inheritance = self._get_interface_inheritance(node, source_code)
             if inheritance:
                 return f"interface {name} extends {inheritance}"
@@ -75,8 +75,8 @@ class TypeScriptExtractor(SignatureExtractor):
         type_annotation = self.find_child_by_type(node, "type_annotation")
         if type_annotation:
             # Get the type part (skip the ':')
-            for child in type_annotation.children:
-                if child.type != ":":
+            for child in self.node_children(type_annotation):
+                if self.node_type(child) != ":":
                     return self.get_node_text(child, source_code)
         return None
     
@@ -87,8 +87,8 @@ class TypeScriptExtractor(SignatureExtractor):
             extends_clause = self.find_child_by_type(heritage_clause, "extends_clause")
             if extends_clause:
                 # Find the type being extended
-                for child in extends_clause.children:
-                    if child.type in ["identifier", "type_identifier"]:
+                for child in self.node_children(extends_clause):
+                    if self.node_type(child) in ["identifier", "type_identifier"]:
                         return self.get_node_text(child, source_code)
         return None
     
@@ -98,8 +98,8 @@ class TypeScriptExtractor(SignatureExtractor):
         if heritage_clause:
             # Get all extended interfaces
             extended = []
-            for child in heritage_clause.children:
-                if child.type in ["identifier", "type_identifier"]:
+            for child in self.node_children(heritage_clause):
+                if self.node_type(child) in ["identifier", "type_identifier"]:
                     extended.append(self.get_node_text(child, source_code))
             return ", ".join(extended) if extended else None
-        return None 
+        return None
