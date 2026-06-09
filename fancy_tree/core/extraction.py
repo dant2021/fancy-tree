@@ -44,6 +44,8 @@ def node_type(node) -> str:
 def node_children(node) -> list:
     """Return child nodes across sequence and child_count/child APIs."""
     children = getattr(node, "children", None)
+    if callable(children):
+        children = children()
     if children is not None:
         return children
     child_count = node.child_count
@@ -76,6 +78,12 @@ def node_end_byte(node) -> int:
     """Return the end byte across property and callable APIs."""
     end_byte = node.end_byte
     return end_byte() if callable(end_byte) else end_byte
+
+
+def node_text(node, source_code: str) -> str:
+    """Return node text by slicing UTF-8 bytes with tree-sitter byte offsets."""
+    source_bytes = source_code.encode("utf-8")
+    return source_bytes[node_start_byte(node):node_end_byte(node)].decode("utf-8")
 
 
 def get_parser_for_language(language: str) -> Optional[Parser]:
@@ -225,7 +233,7 @@ def _extract_name_from_node(node, source_code: str, config) -> Optional[str]:
     """Extract name from node using configured name node types."""
     for child in node_children(node):
         if node_type(child) in config.name_nodes:
-            return source_code[node_start_byte(child):node_end_byte(child)]
+            return node_text(child, source_code)
     
     return None
 

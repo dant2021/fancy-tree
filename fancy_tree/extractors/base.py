@@ -19,6 +19,8 @@ def node_type(node: Node) -> str:
 def node_children(node: Node) -> list[Node]:
     """Return child nodes across sequence and child_count/child APIs."""
     children = getattr(node, "children", None)
+    if callable(children):
+        children = children()
     if children is not None:
         return children
     child_count = node.child_count
