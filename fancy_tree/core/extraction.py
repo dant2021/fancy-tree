@@ -383,7 +383,7 @@ def process_repository(repo_path: Path,
                     rel_path = abs_file.relative_to(abs_repo)
                 except ValueError:
                     # Fallback if paths are incompatible
-                    rel_path = file_path.name
+                    rel_path = Path(file_path.name)
                 
                 file_info = process_file(file_path, language, max_lines)
                 file_info.path = str(rel_path)
@@ -407,7 +407,7 @@ def process_repository(repo_path: Path,
         try:
             rel_path = file_path.resolve().relative_to(repo_path.resolve())
         except ValueError:
-            rel_path = file_path.name
+            rel_path = Path(file_path.name)
 
         # no symbols, no lines, no language
         file_info = FileInfo(
