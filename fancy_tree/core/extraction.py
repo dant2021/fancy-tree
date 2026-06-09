@@ -1,5 +1,7 @@
 """Generic symbol extraction using tree-sitter and language configurations."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from rich.console import Console

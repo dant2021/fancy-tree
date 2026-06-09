@@ -1,5 +1,7 @@
 """Base classes for the signature extraction registry pattern."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from tree_sitter import Node

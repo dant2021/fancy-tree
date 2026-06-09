@@ -2,6 +2,7 @@
 
 import sys
 import json
+from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from typing import Optional, List
 
@@ -113,9 +114,9 @@ def main(
 def version_command():
     """Actual version logic."""
     try:
+        __version__ = package_version("fancy-tree")
+    except PackageNotFoundError:
         from . import __version__
-    except ImportError:
-        __version__ = "0.1.0"
     console.print(f"fancy-tree version {__version__}")
 
 
@@ -193,4 +194,4 @@ def test(path: Optional[Path] = typer.Argument(None, help="Path to test (default
 
 
 if __name__ == "__main__":
-    app() 
+    app()

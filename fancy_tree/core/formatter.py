@@ -1,5 +1,7 @@
 """Enhanced formatting for multi-language repository output."""
 
+from __future__ import annotations
+
 from typing import List, Dict
 from pathlib import Path
 from ..schema import RepoSummary, DirectoryInfo, FileInfo, Symbol, SymbolType
