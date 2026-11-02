@@ -1,6 +1,6 @@
 """C-specific signature extraction using tree-sitter."""
 
-from .base import SignatureExtractor
+from .base import SignatureExtractor, node_parent
 from tree_sitter import Node
 from typing import Optional
 
@@ -35,12 +35,24 @@ class CExtractor(SignatureExtractor):
     def get_symbol_name(
         self, node: Node, source_code: str, name_nodes=None
     ) -> Optional[str]:
-        """Name function definitions and prototypes through their declarator."""
-        if self.node_type(node) not in ("function_definition", "declaration"):
+        """Name definitions and prototypes; skip type references and variables."""
+        if self.node_type(node) in ("struct_specifier", "union_specifier", "enum_specifier"):
+            # `struct point p` only references a type; definitions have a body.
+            if node.child_by_field_name("body") is None:
+                return None
+            return super().get_symbol_name(node, source_code, name_nodes)
+        if self.node_type(node) not in ("function_definition", "function_declarator"):
             return super().get_symbol_name(node, source_code, name_nodes)
         declarator = self._get_function_declarator(node)
         if declarator is None:
-            # Variable declarations are not symbols.
+            return None
+        # A definition is named by its function_definition node, not its declarator;
+        # declarators in parameters or casts are not symbols.
+        owner = self._get_owner(declarator)
+        if owner is None or (
+            self.node_type(node) == "function_declarator"
+            and self.node_type(owner) != "declaration"
+        ):
             return None
         name = declarator.child_by_field_name("declarator")
         # Function pointers have a parenthesized declarator, not a name.
@@ -50,11 +62,22 @@ class CExtractor(SignatureExtractor):
 
     def _get_function_declarator(self, node: Node) -> Optional[Node]:
         """Find the function_declarator under any pointer declarators."""
+        if self.node_type(node) == "function_declarator":
+            return node
         declarator = node.child_by_field_name("declarator")
         while declarator is not None and self.node_type(declarator) == "pointer_declarator":
             declarator = declarator.child_by_field_name("declarator")
         if declarator is not None and self.node_type(declarator) == "function_declarator":
             return declarator
+        return None
+
+    def _get_owner(self, declarator: Node) -> Optional[Node]:
+        """Return the definition or prototype declaration a function_declarator belongs to."""
+        parent = node_parent(declarator)
+        while parent is not None and self.node_type(parent) == "pointer_declarator":
+            parent = node_parent(parent)
+        if parent is not None and self.node_type(parent) in ("function_definition", "declaration"):
+            return parent
         return None
     
     def _get_struct_name(self, node: Node, source_code: str) -> str:
@@ -76,12 +99,15 @@ class CExtractor(SignatureExtractor):
     
     def _get_return_type(self, node: Node, source_code: str) -> Optional[str]:
         """Extract return type, including pointer declarators such as int *f()."""
-        return_type = node.child_by_field_name("type")
+        declarator = self._get_function_declarator(node)
+        owner = self._get_owner(declarator) if declarator is not None else None
+        return_type = owner.child_by_field_name("type") if owner is not None else None
         if return_type is None:
             return None
+        # Each declarator in `int *a(void), b(void);` has its own pointer depth.
         pointers = 0
-        declarator = node.child_by_field_name("declarator")
-        while declarator is not None and self.node_type(declarator) == "pointer_declarator":
+        parent = node_parent(declarator)
+        while parent is not None and self.node_type(parent) == "pointer_declarator":
             pointers += 1
-            declarator = declarator.child_by_field_name("declarator")
+            parent = node_parent(parent)
         return self.get_node_text(return_type, source_code) + "*" * pointers

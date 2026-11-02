@@ -7,6 +7,8 @@ from fancy_tree.schema import ExtractionStatus, SymbolType
 def symbols(source, language):
     result = extraction.extract_symbols_with_diagnostics(source, language)
     assert result.status == ExtractionStatus.SUCCESS, result.diagnostics
+    # These cases expect a flat list; nested symbols would be spurious.
+    assert all(not symbol.children for symbol in result.symbols)
     return [(symbol.name, symbol.type, symbol.signature) for symbol in result.symbols]
 
 
@@ -51,4 +53,29 @@ def test_c_definitions_and_prototypes_keep_types_and_parameters():
         ("add", SymbolType.FUNCTION, "int add(int a, int b)"),
         ("name", SymbolType.FUNCTION, "char* name(void)"),
         ("proto", SymbolType.FUNCTION, "int proto(int)"),
+    ]
+
+
+def test_c_declarations_with_several_declarators_keep_every_function():
+    assert symbols("int first(void), *second(int x), third;", "c") == [
+        ("first", SymbolType.FUNCTION, "int first(void)"),
+        ("second", SymbolType.FUNCTION, "int* second(int x)"),
+    ]
+
+
+def test_c_type_references_are_not_struct_symbols():
+    source = (
+        "struct point { int x; };\n"
+        "enum color { RED };\n"
+        "struct point make(struct point p, enum color c) { struct point q = p; return q; }\n"
+        "struct point origin(void);\n"
+        "struct point global;\n"
+        "void callback(int handler(int));\n"
+    )
+    assert symbols(source, "c") == [
+        ("point", SymbolType.CLASS, "struct point"),
+        ("color", SymbolType.CLASS, "enum color"),
+        ("make", SymbolType.FUNCTION, "struct point make(struct point p, enum color c)"),
+        ("origin", SymbolType.FUNCTION, "struct point origin(void)"),
+        ("callback", SymbolType.FUNCTION, "void callback(int handler(int))"),
     ]

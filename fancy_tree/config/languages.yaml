@@ -75,8 +75,8 @@ go:
 
 c:
   extensions: [".c", ".h"]
-  # Declarations are kept only when they declare a function (prototypes).
-  function_nodes: ["function_definition", "declaration"]
+  # Declarators are kept only for prototypes; definitions use function_definition.
+  function_nodes: ["function_definition", "function_declarator"]
   class_nodes: ["struct_specifier", "union_specifier", "enum_specifier"]
   name_nodes: ["identifier"]
   signature_templates:
