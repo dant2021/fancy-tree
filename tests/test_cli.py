@@ -79,6 +79,30 @@ def test_cli_json_file_preserves_diagnostics(repository, tmp_path):
     assert broken["diagnostics"][0]["code"] == "parse_error"
 
 
+def test_cli_preserves_large_line_numbers_without_crashing(repository):
+    # Rows above CPython's small-integer cache expose unsafe native Point.row
+    # references. Run the real CLI in a subprocess so a segfault fails this test.
+    source = "\n" * 300 + "".join(
+        f"def function_{index}(value):\n    return value\n\n" for index in range(128)
+    )
+    path = repository / "large.py"
+    path.write_text(source)
+    subprocess.run(
+        ["git", "add", path.name], cwd=repository, check=True, capture_output=True
+    )
+    result = run_cli([str(repository), "--json", "--quiet"])
+    assert result.returncode == 0, result.stdout + result.stderr
+    data = json.loads(result.stdout)
+    info = next(
+        file for file in data["structure"]["files"] if file["path"] == "large.py"
+    )
+    assert info["extraction_status"] == "success"
+    assert info["diagnostics"] == []
+    assert [(symbol["name"], symbol["line"]) for symbol in info["symbols"]] == [
+        (f"function_{index}", 301 + 3 * index) for index in range(128)
+    ]
+
+
 @pytest.mark.parametrize(
     "options", [[], ["--quiet"], ["--json"], ["--json", "--quiet"]]
 )

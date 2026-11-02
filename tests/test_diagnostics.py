@@ -231,3 +231,16 @@ def test_disabled_installation_does_not_prompt_even_in_a_terminal(
         config.show_language_status_and_install(tmp_path, allow_install=False)
         == availability
     )
+
+
+@pytest.mark.parametrize(
+    "node",
+    [
+        SimpleNamespace(start_point=(300, 5)),
+        SimpleNamespace(start_point=lambda: (300, 5)),
+        SimpleNamespace(start_point=SimpleNamespace(row=300, column=5)),
+        SimpleNamespace(start_position=lambda: SimpleNamespace(row=300, column=5)),
+    ],
+)
+def test_line_numbers_support_point_and_position_apis(node):
+    assert extraction.node_start_line(node) == 301

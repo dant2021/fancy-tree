@@ -76,9 +76,14 @@ def node_start_line(node) -> int:
         point = node.start_position
     if callable(point):
         point = point()
-    if hasattr(point, "row"):
-        return point.row + 1
-    return point[0] + 1
+    # tree-sitter 0.26.0's Point.row getter returns a borrowed reference.
+    # Indexing avoids corrupting reference counts, especially for rows > 256.
+    try:
+        row = point[0]
+    except TypeError:
+        # Some parser bindings expose a point object without tuple indexing.
+        row = point.row
+    return row + 1
 
 
 def node_start_byte(node) -> int:
