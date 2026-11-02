@@ -14,7 +14,9 @@ python:
   
 typescript:
   extensions: [".ts", ".tsx"]
-  function_nodes: ["function_declaration", "method_definition", "arrow_function"]
+  parser_by_extension:
+    .tsx: tsx
+  function_nodes: ["function_declaration", "method_definition", "method_signature", "arrow_function"]
   class_nodes: ["class_declaration"]
   interface_nodes: ["interface_declaration"]
   name_nodes: ["identifier", "type_identifier"]

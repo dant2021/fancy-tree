@@ -20,6 +20,28 @@ class SymbolType(Enum):
     TYPE_ALIAS = "type_alias"
 
 
+class ExtractionStatus(Enum):
+    """Whether a file's symbol list is complete for the supported declarations."""
+
+    NOT_ATTEMPTED = "not_attempted"
+    SUCCESS = "success"
+    RECOVERED = "recovered"
+    PARSER_UNAVAILABLE = "parser_unavailable"
+    FAILED = "failed"
+
+
+@dataclass
+class Diagnostic:
+    """A parsing or extraction problem, independent of the recovered symbols."""
+
+    code: str
+    message: str
+    line: Optional[int] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"code": self.code, "message": self.message, "line": self.line}
+
+
 @dataclass
 class Symbol:
     """A code symbol with enhanced multi-language support."""
@@ -42,6 +64,16 @@ class Symbol:
 
 
 @dataclass
+class ExtractionResult:
+    """Symbols and diagnostics from one extraction attempt."""
+
+    symbols: List[Symbol] = field(default_factory=list)
+    status: ExtractionStatus = ExtractionStatus.NOT_ATTEMPTED
+    parser_language: Optional[str] = None
+    diagnostics: List[Diagnostic] = field(default_factory=list)
+
+
+@dataclass
 class FileInfo:
     """Enhanced file information with language metadata."""
     path: str  # Relative to repo root
@@ -49,6 +81,9 @@ class FileInfo:
     lines: int
     symbols: List[Symbol] = field(default_factory=list)
     has_signature_support: bool = True  # NEW: Track if signatures are implemented
+    extraction_status: ExtractionStatus = ExtractionStatus.NOT_ATTEMPTED
+    parser_language: Optional[str] = None
+    diagnostics: List[Diagnostic] = field(default_factory=list)
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -56,7 +91,10 @@ class FileInfo:
             "language": self.language,
             "lines": self.lines,
             "has_signature_support": self.has_signature_support,
-            "symbols": [symbol.to_dict() for symbol in self.symbols]
+            "extraction_status": self.extraction_status.value,
+            "parser_language": self.parser_language,
+            "diagnostics": [diagnostic.to_dict() for diagnostic in self.diagnostics],
+            "symbols": [symbol.to_dict() for symbol in self.symbols],
         }
 
 
@@ -130,13 +168,7 @@ def create_flat_file_list(repo_summary: RepoSummary) -> List[Dict[str, Any]]:
     
     def collect_files(dir_info: DirectoryInfo, current_path: str = ""):
         for file_info in dir_info.files:
-            files.append({
-                "path": file_info.path,
-                "language": file_info.language,
-                "lines": file_info.lines,
-                "has_signature_support": file_info.has_signature_support,
-                "symbols": [s.to_dict() for s in file_info.symbols]
-            })
+            files.append(file_info.to_dict())
         
         for subdir in dir_info.subdirs:
             collect_files(subdir, current_path)

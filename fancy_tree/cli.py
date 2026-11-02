@@ -2,6 +2,8 @@
 
 import sys
 import json
+from contextlib import redirect_stdout
+from io import StringIO
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from typing import Optional, List
@@ -20,6 +22,7 @@ app = typer.Typer(
     context_settings={"allow_interspersed_args": True}  # 2️⃣ let options appear after path
 )
 console = Console()
+progress_console = Console(stderr=True)
 
 # Define subcommand names to avoid treating them as paths
 SUBCOMMAND_NAMES = {"languages", "version", "test"}
@@ -60,28 +63,31 @@ def main(
     
     # Validate path
     if not path.exists():
-        console.print(f"Error: Path '{path}' does not exist", style="red")
+        progress_console.print(f"Error: Path '{path}' does not exist", style="red")
         raise typer.Exit(1)
     
     if not path.is_dir():
-        console.print(f"Error: Path '{path}' is not a directory", style="red")
+        progress_console.print(f"Error: Path '{path}' is not a directory", style="red")
         raise typer.Exit(1)
     
     if not quiet:
-        console.print(f"Scanning repository: {path}")
+        progress_console.print(f"Scanning repository: {path}")
         if languages:
-            console.print(f"Language filter: {', '.join(languages)}")
+            progress_console.print(f"Language filter: {', '.join(languages)}")
         if max_files:
-            console.print(f"Max files: {max_files}")
+            progress_console.print(f"Max files: {max_files}")
     
     try:
         # Process repository
-        repo_summary = process_repository(
-            repo_path=path,
-            language_filter=languages,
-            max_files=max_files,
-            max_lines=max_lines
-        )
+        # Keep stdout usable as JSON, and suppress progress when requested.
+        with redirect_stdout(StringIO() if quiet else sys.stderr):
+            repo_summary = process_repository(
+                repo_path=path,
+                language_filter=languages,
+                max_files=max_files,
+                max_lines=max_lines,
+                allow_install=not (quiet or json_output),
+            )
         
         # Format output - always group by structure now
         if json_output:
@@ -96,18 +102,20 @@ def main(
         if output:
             output.write_text(output_content, encoding='utf-8')
             if not quiet:
-                console.print(f"Results written to: {output}")
+                progress_console.print(f"Results written to: {output}")
         else:
-            console.print(output_content)
+            typer.echo(output_content)
         
         if not quiet:
-            console.print(f"\nProcessed {repo_summary.total_files} files in {len(repo_summary.languages)} languages")
+            progress_console.print(
+                f"\nProcessed {repo_summary.total_files} files in {len(repo_summary.languages)} languages"
+            )
     
     except Exception as e:
-        console.print(f"Error processing repository: {e}", style="red")
+        progress_console.print(f"Error processing repository: {e}", style="red")
         if not quiet:
             import traceback
-            console.print(traceback.format_exc())
+            progress_console.print(traceback.format_exc())
         raise typer.Exit(1)
 
 

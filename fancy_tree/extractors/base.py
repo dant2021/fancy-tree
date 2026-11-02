@@ -59,6 +59,18 @@ class SignatureExtractor(ABC):
         """Extract method signature (defaults to function signature)."""
         return self.extract_function_signature(node, source_code, template)
 
+    def get_function_name(
+        self, node: Node, source_code: str, name_nodes=None
+    ) -> Optional[str]:
+        """Prefer the grammar's name field, with configured fallbacks for other grammars."""
+        name = node.child_by_field_name("name")
+        if name is not None:
+            return self.get_node_text(name, source_code)
+        for child in self.node_children(node):
+            if self.node_type(child) in (name_nodes or ["identifier"]):
+                return self.get_node_text(child, source_code)
+        return None
+
     def get_node_text(self, node: Node, source_code: Union[str, bytes]) -> str:
         """
         Return the exact source substring represented by *node*.

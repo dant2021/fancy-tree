@@ -8,12 +8,23 @@ from rich.console import Console
 from tree_sitter import Parser, Language
 
 # Change relative imports to absolute imports
-from ..schema import Symbol, SymbolType, FileInfo, DirectoryInfo, RepoSummary
+from ..schema import (
+    Diagnostic,
+    ExtractionResult,
+    ExtractionStatus,
+    Symbol,
+    SymbolType,
+    FileInfo,
+    DirectoryInfo,
+    RepoSummary,
+)
 from ..extractors import get_signature_extractor
+from ..extractors.base import NotImplementedExtractor
 from .config import get_language_config
 from .discovery import scan_repository, count_lines
 
 console = Console()
+diagnostic_console = Console(stderr=True)
 
 # Parser cache to avoid recreating parsers
 _parser_cache: Dict[str, Optional[Parser]] = {}
@@ -111,52 +122,135 @@ def get_parser_for_language(language: str) -> Optional[Parser]:
         return None
 
 
-def extract_symbols_generic(source_code: str, language: str) -> List[Symbol]:
-    """Generic symbol extraction using your proven pattern."""
+def extract_symbols_with_diagnostics(
+    source_code: str, language: str, *, file_path: Optional[Path] = None
+) -> ExtractionResult:
+    """Extract supported declarations and report incomplete parsing/extraction."""
+    result = ExtractionResult()
     config = get_language_config(language)
-    parser = get_parser_for_language(language)
-    if not config or not parser:
-        return []
+    if config is None:
+        result.diagnostics.append(
+            Diagnostic(
+                "unsupported_language", f"No extraction configuration for {language}."
+            )
+        )
+        return result
+    result.parser_language = config.get_parser_language(file_path)
+    parser = get_parser_for_language(result.parser_language)
+    if parser is None:
+        result.status = ExtractionStatus.PARSER_UNAVAILABLE
+        result.diagnostics.append(
+            Diagnostic(
+                "parser_unavailable",
+                f"Parser unavailable for {result.parser_language}; symbols were not extracted.",
+            )
+        )
+        return result
+
+    try:
+        tree = parse_tree(parser, source_code)
+        root = root_node(tree)
+        has_error = root.has_error
+        if callable(has_error):
+            has_error = has_error()
+    except Exception as e:
+        result.status = ExtractionStatus.FAILED
+        result.diagnostics.append(Diagnostic("parse_failed", f"Parsing failed: {e}"))
+        return result
+
+    result.status = (
+        ExtractionStatus.RECOVERED if has_error else ExtractionStatus.SUCCESS
+    )
+    if has_error:
+        result.diagnostics.append(
+            Diagnostic(
+                "parse_error",
+                "Syntax errors detected; symbols recovered from this tree may be incomplete.",
+            )
+        )
     
     extractor = get_signature_extractor(language)
     
-    # Parse source
-    tree = parse_tree(parser, source_code)
-    symbols = []
-    
     def visit_node(node, parent_symbols=None, inside_class=False):
         if parent_symbols is None:
-            parent_symbols = symbols
+            parent_symbols = result.symbols
         
-        # Use configuration to check node types
         current_type = node_type(node)
-
+        symbol = None
+        child_inside_class = inside_class
         if current_type in config.class_nodes:
-            class_symbol = _extract_class_symbol(node, source_code, config, extractor, language)
-            if class_symbol:
-                parent_symbols.append(class_symbol)
-                # Recurse with class_symbol.children as parent
-                for child in node_children(node):
-                    visit_node(child, class_symbol.children, inside_class=True)
-        
+            symbol = _extract_class_symbol(
+                node, source_code, config, extractor, language, result.diagnostics
+            )
+            child_inside_class = True
+        elif current_type in config.interface_nodes:
+            symbol = _extract_interface_symbol(
+                node, source_code, config, extractor, language, result.diagnostics
+            )
+            child_inside_class = True
         elif current_type in config.function_nodes:
-            function_symbol = _extract_function_symbol(node, source_code, config, extractor, language, inside_class)
-            if function_symbol:
-                parent_symbols.append(function_symbol)
-                # Recurse with function_symbol.children as parent
-                for child in node_children(node):
-                    visit_node(child, function_symbol.children, inside_class)
+            symbol = _extract_function_symbol(
+                node,
+                source_code,
+                config,
+                extractor,
+                language,
+                inside_class,
+                result.diagnostics,
+            )
+            # Declarations nested in a method are functions, not class members.
+            child_inside_class = False
+
+        if symbol is not None:
+            parent_symbols.append(symbol)
+            parent_symbols = symbol.children
+        # Anonymous/unsupported declarations must never hide named descendants.
+        for child in node_children(node):
+            visit_node(child, parent_symbols, child_inside_class)
         
-        else:
-            # Continue traversing with same parent_symbols
-            for child in node_children(node):
-                visit_node(child, parent_symbols, inside_class)
-    
-    visit_node(root_node(tree))
-    return symbols
+    try:
+        visit_node(root)
+    except Exception as e:
+        result.diagnostics.append(
+            Diagnostic(
+                "extraction_failed",
+                f"Symbol extraction failed; results may be incomplete: {e}",
+            )
+        )
+    if any(
+        d.code in ("signature_failed", "extraction_failed") for d in result.diagnostics
+    ):
+        result.status = ExtractionStatus.FAILED
+    return result
 
 
-def _extract_class_symbol(node, source_code: str, config, extractor, language: str) -> Optional[Symbol]:
+def _warn_diagnostics(result: ExtractionResult, source: str) -> None:
+    """Keep legacy list-returning entry points from hiding incomplete extraction."""
+    for diagnostic in result.diagnostics:
+        diagnostic_console.print(
+            f"WARNING: {source}: {diagnostic.code}: {diagnostic.message}", markup=False
+        )
+
+
+def extract_symbols_generic(
+    source_code: str, language: str, *, file_path: Optional[Path] = None
+) -> List[Symbol]:
+    """Return symbols; pass a file path to select dialects such as TSX."""
+    result = extract_symbols_with_diagnostics(
+        source_code, language, file_path=file_path
+    )
+    _warn_diagnostics(result, str(file_path) if file_path is not None else language)
+    return result.symbols
+
+
+def _extract_class_symbol(
+    node,
+    source_code: str,
+    config,
+    extractor,
+    language: str,
+    diagnostics: List[Diagnostic],
+) -> Optional[Symbol]:
     """Extract class symbol using generic approach."""
     name = _extract_name_from_node(node, source_code, config)
     if not name:
@@ -167,7 +261,13 @@ def _extract_class_symbol(node, source_code: str, config, extractor, language: s
         template = config.get_template("class")
         signature = extractor.extract_class_signature(node, source_code, template)
     except Exception as e:
-        console.print(f"WARNING: Signature extraction failed for class {name}: {e}")
+        diagnostics.append(
+            Diagnostic(
+                "signature_failed",
+                f"Signature extraction failed for class {name}: {e}",
+                node_start_line(node),
+            )
+        )
         signature = f"class {name}"
     
     return Symbol(
@@ -179,7 +279,14 @@ def _extract_class_symbol(node, source_code: str, config, extractor, language: s
     )
 
 
-def _extract_interface_symbol(node, source_code: str, config, extractor, language: str) -> Optional[Symbol]:
+def _extract_interface_symbol(
+    node,
+    source_code: str,
+    config,
+    extractor,
+    language: str,
+    diagnostics: List[Diagnostic],
+) -> Optional[Symbol]:
     """Extract interface symbol using generic approach."""
     name = _extract_name_from_node(node, source_code, config)
     if not name:
@@ -189,7 +296,13 @@ def _extract_interface_symbol(node, source_code: str, config, extractor, languag
         template = config.get_template("interface")
         signature = extractor.extract_class_signature(node, source_code, template)  # Reuse class extractor
     except Exception as e:
-        console.print(f"⚠️ Signature extraction failed for interface {name}: {e}")
+        diagnostics.append(
+            Diagnostic(
+                "signature_failed",
+                f"Signature extraction failed for interface {name}: {e}",
+                node_start_line(node),
+            )
+        )
         signature = f"interface {name}"
     
     return Symbol(
@@ -201,9 +314,17 @@ def _extract_interface_symbol(node, source_code: str, config, extractor, languag
     )
 
 
-def _extract_function_symbol(node, source_code: str, config, extractor, language: str, inside_class: bool) -> Optional[Symbol]:
+def _extract_function_symbol(
+    node,
+    source_code: str,
+    config,
+    extractor,
+    language: str,
+    inside_class: bool,
+    diagnostics: List[Diagnostic],
+) -> Optional[Symbol]:
     """Extract function/method symbol using generic approach."""
-    name = _extract_name_from_node(node, source_code, config)
+    name = extractor.get_function_name(node, source_code, config.name_nodes)
     if not name:
         return None
     
@@ -218,7 +339,13 @@ def _extract_function_symbol(node, source_code: str, config, extractor, language
     try:
         signature = extractor.extract_function_signature(node, source_code, template)
     except Exception as e:
-        console.print(f"⚠️ Signature extraction failed for {template_key} {name}: {e}")
+        diagnostics.append(
+            Diagnostic(
+                "signature_failed",
+                f"Signature extraction failed for {template_key} {name}: {e}",
+                node_start_line(node),
+            )
+        )
         fallback = "def " if language == "python" else ""
         signature = f"{fallback}{name}(...)"
     
@@ -233,6 +360,9 @@ def _extract_function_symbol(node, source_code: str, config, extractor, language
 
 def _extract_name_from_node(node, source_code: str, config) -> Optional[str]:
     """Extract name from node using configured name node types."""
+    name = node.child_by_field_name("name")
+    if name is not None:
+        return node_text(name, source_code)
     for child in node_children(node):
         if node_type(child) in config.name_nodes:
             return node_text(child, source_code)
@@ -240,17 +370,24 @@ def _extract_name_from_node(node, source_code: str, config) -> Optional[str]:
     return None
 
 
-def extract_symbols_from_file(file_path: Path, language: str) -> List[Symbol]:
-    """Extract symbols from a single file."""
+def extract_file_with_diagnostics(file_path: Path, language: str) -> ExtractionResult:
+    """Read a source file and retain both parser dialect and failure diagnostics."""
     try:
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             source_code = f.read()
-        
-        return extract_symbols_generic(source_code, language)
-        
-    except Exception as e:
-        console.print(f"ERROR: Error reading {file_path}: {e}")
-        return []
+    except (OSError, UnicodeError) as e:
+        return ExtractionResult(
+            status=ExtractionStatus.FAILED,
+            diagnostics=[Diagnostic("read_failed", f"Could not read source: {e}")],
+        )
+    return extract_symbols_with_diagnostics(source_code, language, file_path=file_path)
+
+
+def extract_symbols_from_file(file_path: Path, language: str) -> List[Symbol]:
+    """Extract symbols from a single file, warning about incomplete extraction."""
+    result = extract_file_with_diagnostics(file_path, language)
+    _warn_diagnostics(result, str(file_path))
+    return result.symbols
 
 
 def count_symbol_output_lines(symbols: List[Symbol]) -> int:
@@ -281,26 +418,32 @@ def flatten_to_top_level(symbols: List[Symbol]) -> List[Symbol]:
 
 def process_file(file_path: Path, language: str, max_lines: Optional[int] = 25) -> FileInfo:
     """Process a single file and return FileInfo."""
-    symbols = extract_symbols_from_file(file_path, language)
+    result = extract_file_with_diagnostics(file_path, language)
+    symbols = result.symbols
     lines = count_lines(file_path)
     
     # Check if the output would be too long
     output_lines = count_symbol_output_lines(symbols)
-    if output_lines > max_lines:
+    if max_lines is not None and output_lines > max_lines:
         # Flatten to only top-level symbols
         symbols = flatten_to_top_level(symbols)
     
     # Check if language has signature support
     config = get_language_config(language)
     extractor = get_signature_extractor(language)
-    has_signature_support = config is not None and not isinstance(extractor, type(extractor)) or hasattr(extractor, 'language')
+    has_signature_support = config is not None and not isinstance(
+        extractor, NotImplementedExtractor
+    )
     
     return FileInfo(
         path=str(file_path),
         language=language,
         lines=lines,
         symbols=symbols,
-        has_signature_support=has_signature_support
+        has_signature_support=has_signature_support,
+        extraction_status=result.status,
+        parser_language=result.parser_language,
+        diagnostics=result.diagnostics,
     )
 
 
@@ -328,7 +471,8 @@ def _get_or_create_dir(root: DirectoryInfo, parts: list[str]) -> DirectoryInfo:
 def process_repository(repo_path: Path, 
                       language_filter: Optional[List[str]] = None,
                       max_files: Optional[int] = None,
-                      max_lines: Optional[int] = 25) -> RepoSummary:
+                      max_lines: Optional[int] = 25,
+                      *, allow_install: bool = True) -> RepoSummary:
     """
     Main orchestration function - processes entire repository.
     
@@ -341,7 +485,7 @@ def process_repository(repo_path: Path,
     
     # Check language availability and offer installation
     from .config import show_language_status_and_install
-    availability = show_language_status_and_install(repo_path)
+    availability = show_language_status_and_install(repo_path, allow_install=allow_install)
     
     # Build repository structure
     root_dir = DirectoryInfo(
