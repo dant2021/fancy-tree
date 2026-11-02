@@ -101,8 +101,10 @@ and `diagnostics` (code, message, and optional line). Status is `success` for a
 clean extraction, `recovered` for a tree with syntax errors, `parser_unavailable`
 for a missing parser, `failed` for read/parse/extraction failures, or
 `not_attempted` for unclassified/unsupported files. A successful extraction can
-have an empty symbol list. Progress goes to stderr, so stdout is valid JSON;
-`--quiet` suppresses progress while preserving diagnostics in the output.
+have an empty symbol list. Files that are not valid UTF-8 are still extracted,
+with undecodable bytes replaced and a `decode_replaced` diagnostic. Progress goes
+to stderr, so stdout is valid JSON; `--quiet` suppresses progress while
+preserving diagnostics in the output and errors on stderr.
 Quiet, JSON, and non-interactive scans report missing parsers without prompting
 to install packages.
 

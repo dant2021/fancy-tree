@@ -1,6 +1,6 @@
 """TypeScript-specific signature extraction using tree-sitter."""
 
-from .base import SignatureExtractor
+from .base import CLASS_FIELD_NODES, SignatureExtractor, node_parent
 from tree_sitter import Node
 from typing import Optional, List
 
@@ -10,11 +10,11 @@ class TypeScriptExtractor(SignatureExtractor):
     
     def extract_function_signature(self, node: Node, source_code: str, template: str) -> str:
         """Extract TypeScript function signature."""
-        name = self.get_function_name(node, source_code) or "anonymous"
+        name = self.get_symbol_name(node, source_code) or "anonymous"
         params = self._get_parameters(node, source_code)
         return_type = self._get_return_type(node, source_code)
         
-        if self.node_type(node) in ("method_definition", "method_signature"):
+        if self._is_method(node):
             # Method signature
             if return_type:
                 return f"{name}({params}): {return_type}"
@@ -39,58 +39,43 @@ class TypeScriptExtractor(SignatureExtractor):
                 return f"interface {name}"
         else:
             # Class declaration
+            keyword = (
+                "abstract class"
+                if self.node_type(node) == "abstract_class_declaration"
+                else "class"
+            )
             inheritance = self._get_class_inheritance(node, source_code)
             if inheritance:
-                return f"class {name} extends {inheritance}"
+                return f"{keyword} {name} extends {inheritance}"
             else:
-                return f"class {name}"
+                return f"{keyword} {name}"
     
-    def get_function_name(
+    def get_symbol_name(
         self, node: Node, source_code: str, name_nodes=None
     ) -> Optional[str]:
         """Resolve declarations and bound arrows; callbacks have no emitted identity."""
-        if self.node_type(node) != "arrow_function":
-            name = node.child_by_field_name("name")
-            return self.get_node_text(name, source_code) if name is not None else None
+        if self.node_type(node) == "arrow_function":
+            return self.get_arrow_function_name(node, source_code)
+        # Object type literal members are types, not callable declarations.
+        if self.node_type(node) == "method_signature" and self.node_type(
+            node_parent(node)
+        ) not in ("interface_body", "class_body"):
+            return None
+        name = node.child_by_field_name("name")
+        return self.get_node_text(name, source_code) if name is not None else None
 
-        # Parentheses and type assertions do not change an arrow's binding.
-        value = node
-        parent = node.parent
-        if callable(parent):
-            parent = parent()
-        while parent is not None and self.node_type(parent) in (
-            "parenthesized_expression",
-            "as_expression",
-            "satisfies_expression",
-            "type_assertion",
-            "non_null_expression",
+    def _is_method(self, node: Node) -> bool:
+        """Methods, member signatures and arrow-valued class fields share one format."""
+        if self.node_type(node) in (
+            "method_definition",
+            "method_signature",
+            "abstract_method_signature",
         ):
-            value = parent
-            parent = parent.parent
-            if callable(parent):
-                parent = parent()
-
-        if parent is None or parent.child_by_field_name("value") != value:
-            return None
-        parent_type = self.node_type(parent)
-        if parent_type == "variable_declarator":
-            name = parent.child_by_field_name("name")
-            allowed = ("identifier",)
-        elif parent_type in ("pair", "public_field_definition"):
-            name = parent.child_by_field_name(
-                "key" if parent_type == "pair" else "name"
-            )
-            allowed = (
-                "property_identifier",
-                "private_property_identifier",
-                "string",
-                "number",
-            )
-        else:
-            return None
-        if name is not None and self.node_type(name) in allowed:
-            return self.get_node_text(name, source_code)
-        return None
+            return True
+        if self.node_type(node) != "arrow_function":
+            return False
+        binding = self.get_arrow_binding(node)
+        return binding is not None and self.node_type(binding) in CLASS_FIELD_NODES
     
     def _get_class_name(self, node: Node, source_code: str) -> str:
         """Extract class or interface name."""

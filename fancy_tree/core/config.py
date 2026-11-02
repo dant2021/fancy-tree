@@ -145,14 +145,10 @@ class ConfigManager:
             lang_config.get_parser_language(Path("source" + extension))
             for extension in extensions
         } or {lang_name}
-        try:
-            from tree_sitter_language_pack import get_parser
+        # Share the extraction cache so each grammar is only built once per run.
+        from .extraction import get_parser_for_language
 
-            for grammar in sorted(grammars):
-                get_parser(grammar)
-            return True
-        except Exception:
-            return False
+        return all(get_parser_for_language(grammar) is not None for grammar in sorted(grammars))
     
     def detect_available_languages(self, repo_path: Path) -> Dict[str, Dict[str, Any]]:
         """Detect which languages exist in repo and which parsers are available."""
@@ -282,7 +278,10 @@ def show_language_status_and_install(
     
     if missing_packages and allow_install and sys.stdin.isatty():
         config_manager.install_missing_packages(missing_packages)
-        # Re-check availability after installation
+        # Re-check availability after installation, retrying grammars that failed.
+        from .extraction import clear_failed_parsers
+
+        clear_failed_parsers()
         availability = config_manager.detect_available_languages(repo_path)
     
     return availability

@@ -16,8 +16,8 @@ typescript:
   extensions: [".ts", ".tsx"]
   parser_by_extension:
     .tsx: tsx
-  function_nodes: ["function_declaration", "method_definition", "method_signature", "arrow_function"]
-  class_nodes: ["class_declaration"]
+  function_nodes: ["function_declaration", "method_definition", "method_signature", "abstract_method_signature", "arrow_function"]
+  class_nodes: ["class_declaration", "abstract_class_declaration"]
   interface_nodes: ["interface_declaration"]
   name_nodes: ["identifier", "type_identifier"]
   signature_templates:
@@ -75,7 +75,8 @@ go:
 
 c:
   extensions: [".c", ".h"]
-  function_nodes: ["function_definition", "function_declarator"]
+  # Declarations are kept only when they declare a function (prototypes).
+  function_nodes: ["function_definition", "declaration"]
   class_nodes: ["struct_specifier", "union_specifier", "enum_specifier"]
   name_nodes: ["identifier"]
   signature_templates:

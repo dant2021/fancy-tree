@@ -10,7 +10,7 @@ class CExtractor(SignatureExtractor):
     
     def extract_function_signature(self, node: Node, source_code: str, template: str) -> str:
         """Extract C function signature."""
-        name = self._get_function_name(node, source_code)
+        name = self.get_symbol_name(node, source_code) or "unknown_function"
         params = self._get_parameters(node, source_code)
         return_type = self._get_return_type(node, source_code)
         
@@ -32,22 +32,30 @@ class CExtractor(SignatureExtractor):
         else:
             return f"type {name}"
     
-    def _get_function_name(self, node: Node, source_code: str) -> str:
-        """Extract function name."""
-        # For function_definition, look for function_declarator
-        if self.node_type(node) == "function_definition":
-            declarator = self.find_child_by_type(node, "function_declarator")
-            if declarator:
-                identifier = self.find_child_by_type(declarator, "identifier")
-                if identifier:
-                    return self.get_node_text(identifier, source_code)
-        
-        # For function_declarator, find identifier directly
-        identifier = self.find_child_by_type(node, "identifier")
-        if identifier:
-            return self.get_node_text(identifier, source_code)
-        
-        return "unknown_function"
+    def get_symbol_name(
+        self, node: Node, source_code: str, name_nodes=None
+    ) -> Optional[str]:
+        """Name function definitions and prototypes through their declarator."""
+        if self.node_type(node) not in ("function_definition", "declaration"):
+            return super().get_symbol_name(node, source_code, name_nodes)
+        declarator = self._get_function_declarator(node)
+        if declarator is None:
+            # Variable declarations are not symbols.
+            return None
+        name = declarator.child_by_field_name("declarator")
+        # Function pointers have a parenthesized declarator, not a name.
+        if name is not None and self.node_type(name) == "identifier":
+            return self.get_node_text(name, source_code)
+        return None
+
+    def _get_function_declarator(self, node: Node) -> Optional[Node]:
+        """Find the function_declarator under any pointer declarators."""
+        declarator = node.child_by_field_name("declarator")
+        while declarator is not None and self.node_type(declarator) == "pointer_declarator":
+            declarator = declarator.child_by_field_name("declarator")
+        if declarator is not None and self.node_type(declarator) == "function_declarator":
+            return declarator
+        return None
     
     def _get_struct_name(self, node: Node, source_code: str) -> str:
         """Extract struct/enum name."""
@@ -58,21 +66,22 @@ class CExtractor(SignatureExtractor):
     
     def _get_parameters(self, node: Node, source_code: str) -> str:
         """Extract function parameters."""
-        # Look for parameter_list in function_declarator
-        declarator = self.find_child_by_type(node, "function_declarator")
+        declarator = self._get_function_declarator(node)
         if declarator:
-            param_list = self.find_child_by_type(declarator, "parameter_list")
+            param_list = declarator.child_by_field_name("parameters")
             if param_list:
                 params_text = self.get_node_text(param_list, source_code)
-                return params_text.strip("()")
+                return params_text[1:-1]
         return ""
     
     def _get_return_type(self, node: Node, source_code: str) -> Optional[str]:
-        """Extract return type."""
-        # For function_definition, the first child is usually the return type
-        children = self.node_children(node)
-        if self.node_type(node) == "function_definition" and children:
-            first_child = children[0]
-            if self.node_type(first_child) != "function_declarator":
-                return self.get_node_text(first_child, source_code)
-        return None
+        """Extract return type, including pointer declarators such as int *f()."""
+        return_type = node.child_by_field_name("type")
+        if return_type is None:
+            return None
+        pointers = 0
+        declarator = node.child_by_field_name("declarator")
+        while declarator is not None and self.node_type(declarator) == "pointer_declarator":
+            pointers += 1
+            declarator = declarator.child_by_field_name("declarator")
+        return self.get_node_text(return_type, source_code) + "*" * pointers

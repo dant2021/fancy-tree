@@ -42,6 +42,38 @@ def node_end_byte(node: Node) -> int:
     end_byte = node.end_byte
     return end_byte() if callable(end_byte) else end_byte
 
+
+def node_parent(node: Node) -> Optional[Node]:
+    """Return the parent node across property and callable APIs."""
+    parent = node.parent
+    return parent() if callable(parent) else parent
+
+
+# Expressions that wrap an arrow function without changing what it is bound to.
+ARROW_WRAPPER_NODES = (
+    "parenthesized_expression",
+    "as_expression",
+    "satisfies_expression",
+    "type_assertion",
+    "non_null_expression",
+)
+# Nodes that bind an arrow function, mapped to the field holding the bound name.
+ARROW_BINDING_NAME_FIELDS = {
+    "variable_declarator": "name",
+    "pair": "key",
+    "public_field_definition": "name",  # TypeScript class field
+    "field_definition": "property",  # JavaScript class field
+}
+# Destructuring patterns and computed keys do not give an arrow a single name.
+ARROW_BINDING_NAME_NODES = (
+    "identifier",
+    "property_identifier",
+    "private_property_identifier",
+    "string",
+    "number",
+)
+CLASS_FIELD_NODES = ("public_field_definition", "field_definition")
+
 class SignatureExtractor(ABC):
     """Abstract base class for language-specific signature extractors."""
     
@@ -59,16 +91,44 @@ class SignatureExtractor(ABC):
         """Extract method signature (defaults to function signature)."""
         return self.extract_function_signature(node, source_code, template)
 
-    def get_function_name(
+    def get_symbol_name(
         self, node: Node, source_code: str, name_nodes=None
     ) -> Optional[str]:
         """Prefer the grammar's name field, with configured fallbacks for other grammars."""
+        if self.node_type(node) == "arrow_function":
+            return self.get_arrow_function_name(node, source_code)
         name = node.child_by_field_name("name")
         if name is not None:
             return self.get_node_text(name, source_code)
         for child in self.node_children(node):
             if self.node_type(child) in (name_nodes or ["identifier"]):
                 return self.get_node_text(child, source_code)
+        return None
+
+    def get_arrow_binding(self, node: Node) -> Optional[Node]:
+        """Return the declarator, pair or class field an arrow function is bound to."""
+        # Parentheses and type assertions do not change an arrow's binding.
+        value = node
+        parent = node_parent(node)
+        while parent is not None and self.node_type(parent) in ARROW_WRAPPER_NODES:
+            value = parent
+            parent = node_parent(parent)
+        if parent is None or self.node_type(parent) not in ARROW_BINDING_NAME_FIELDS:
+            return None
+        if parent.child_by_field_name("value") != value:
+            return None
+        return parent
+
+    def get_arrow_function_name(self, node: Node, source_code: str) -> Optional[str]:
+        """Name arrows by their binding; callbacks have no emitted identity."""
+        binding = self.get_arrow_binding(node)
+        if binding is None:
+            return None
+        name = binding.child_by_field_name(
+            ARROW_BINDING_NAME_FIELDS[self.node_type(binding)]
+        )
+        if name is not None and self.node_type(name) in ARROW_BINDING_NAME_NODES:
+            return self.get_node_text(name, source_code)
         return None
 
     def get_node_text(self, node: Node, source_code: Union[str, bytes]) -> str:

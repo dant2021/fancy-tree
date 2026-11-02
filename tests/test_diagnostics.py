@@ -140,7 +140,7 @@ def test_signature_failure_retains_symbol_and_reports_fallback(
 
 def test_extraction_failure_keeps_symbols_already_recovered(monkeypatch):
     extractor = get_signature_extractor("typescript")
-    resolve_name = extractor.get_function_name
+    resolve_name = extractor.get_symbol_name
 
     def fail_on_second(node, source, name_nodes=None):
         name = resolve_name(node, source, name_nodes)
@@ -148,7 +148,7 @@ def test_extraction_failure_keeps_symbols_already_recovered(monkeypatch):
             raise ValueError("cannot resolve name")
         return name
 
-    monkeypatch.setattr(extractor, "get_function_name", fail_on_second)
+    monkeypatch.setattr(extractor, "get_symbol_name", fail_on_second)
     result = extraction.extract_symbols_with_diagnostics(
         "function first() {} function second() {}", "typescript"
     )
@@ -157,16 +157,22 @@ def test_extraction_failure_keeps_symbols_already_recovered(monkeypatch):
     assert result.diagnostics[0].code == "extraction_failed"
 
 
-@pytest.mark.parametrize("unreadable", ["missing", "invalid_utf8"])
-def test_unreadable_source_is_reported(tmp_path, unreadable):
-    path = tmp_path / "unreadable.ts"
-    if unreadable == "invalid_utf8":
-        path.write_bytes(b"const value = '\xff';")
-    info = extraction.process_file(path, "typescript")
+def test_missing_source_is_reported(tmp_path):
+    info = extraction.process_file(tmp_path / "missing.ts", "typescript")
     assert info.extraction_status == ExtractionStatus.FAILED
     assert info.symbols == []
     assert info.diagnostics[0].code == "read_failed"
     assert "WARNING (read_failed)" in format_file(info)
+
+
+def test_non_utf8_source_keeps_symbols_and_warns(tmp_path):
+    path = tmp_path / "latin1.py"
+    path.write_bytes(b"def a(): pass\n# caf\xe9\ndef b(): pass\n")
+    info = extraction.process_file(path, "python")
+    assert info.extraction_status == ExtractionStatus.SUCCESS
+    assert [symbol.name for symbol in info.symbols] == ["a", "b"]
+    assert info.diagnostics[0].code == "decode_replaced"
+    assert "WARNING (decode_replaced)" in format_file(info)
 
 
 def test_unsupported_language_is_not_reported_as_success():
@@ -195,6 +201,7 @@ def test_availability_checks_the_detected_dialect(monkeypatch):
         return object()
 
     monkeypatch.setattr(tree_sitter_language_pack, "get_parser", parser)
+    monkeypatch.setattr(extraction, "_parser_cache", {})
     manager = ConfigManager()
     config = get_language_config("typescript")
     assert manager._is_parser_available("typescript", config, {".ts"})
@@ -244,3 +251,22 @@ def test_disabled_installation_does_not_prompt_even_in_a_terminal(
 )
 def test_line_numbers_support_point_and_position_apis(node):
     assert extraction.node_start_line(node) == 301
+
+
+def test_file_processing_errors_reach_stderr_and_output(tmp_path, monkeypatch, capsys):
+    (tmp_path / "ok.ts").write_text("function ok() {}")
+    (tmp_path / "bad.ts").write_text("function bad() {}")
+    process_file = extraction.process_file
+
+    def fail_on_bad(path, language, max_lines=25):
+        if path.name == "bad.ts":
+            raise RuntimeError("cannot count lines")
+        return process_file(path, language, max_lines)
+
+    monkeypatch.setattr(extraction, "process_file", fail_on_bad)
+    summary = extraction.process_repository(tmp_path, allow_install=False)
+    files = {info.path: info for info in summary.structure.files}
+    assert files["ok.ts"].extraction_status == ExtractionStatus.SUCCESS
+    assert files["bad.ts"].extraction_status == ExtractionStatus.FAILED
+    assert files["bad.ts"].diagnostics[0].code == "process_failed"
+    assert "Error processing" in capsys.readouterr().err

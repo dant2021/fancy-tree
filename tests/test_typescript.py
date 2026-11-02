@@ -192,3 +192,41 @@ def test_python_class_and_nested_function_still_extract():
     assert (method.name, method.type) == ("hello", SymbolType.METHOD)
     assert "name: str" in method.signature
     assert (inner.name, inner.type) == ("inner", SymbolType.FUNCTION)
+
+
+def test_object_type_literal_members_are_not_functions():
+    result = extraction.extract_symbols_with_diagnostics(
+        "type T = { m(): void }; interface I { n(): void; p: { q(): void } }",
+        "typescript",
+    )
+    (interface,) = result.symbols
+    assert interface.name == "I"
+    assert [child.name for child in interface.children] == ["n"]
+
+
+def test_abstract_classes_keep_abstract_and_concrete_members():
+    result = extraction.extract_symbols_with_diagnostics(
+        "export abstract class B { abstract a(): void; b() {} }", "typescript"
+    )
+    (cls,) = result.symbols
+    assert (cls.name, cls.type, cls.signature) == (
+        "B",
+        SymbolType.CLASS,
+        "abstract class B",
+    )
+    assert [(m.name, m.type, m.signature) for m in cls.children] == [
+        ("a", SymbolType.METHOD, "a(): void"),
+        ("b", SymbolType.METHOD, "b()"),
+    ]
+
+
+def test_class_field_arrows_use_method_signatures():
+    result = extraction.extract_symbols_with_diagnostics(
+        "class A { #p = () => 1; static s = (x: number): string => '' }",
+        "typescript",
+    )
+    (cls,) = result.symbols
+    assert [(m.name, m.type, m.signature) for m in cls.children] == [
+        ("#p", SymbolType.METHOD, "#p()"),
+        ("s", SymbolType.METHOD, "s(x: number): string"),
+    ]

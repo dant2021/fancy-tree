@@ -127,6 +127,12 @@ def get_parser_for_language(language: str) -> Optional[Parser]:
         return None
 
 
+def clear_failed_parsers() -> None:
+    """Forget failed parser loads so they are retried, e.g. after an install."""
+    for language in [lang for lang, parser in _parser_cache.items() if parser is None]:
+        del _parser_cache[language]
+
+
 def extract_symbols_with_diagnostics(
     source_code: str, language: str, *, file_path: Optional[Path] = None
 ) -> ExtractionResult:
@@ -257,7 +263,7 @@ def _extract_class_symbol(
     diagnostics: List[Diagnostic],
 ) -> Optional[Symbol]:
     """Extract class symbol using generic approach."""
-    name = _extract_name_from_node(node, source_code, config)
+    name = extractor.get_symbol_name(node, source_code, config.name_nodes)
     if not name:
         return None
     
@@ -293,7 +299,7 @@ def _extract_interface_symbol(
     diagnostics: List[Diagnostic],
 ) -> Optional[Symbol]:
     """Extract interface symbol using generic approach."""
-    name = _extract_name_from_node(node, source_code, config)
+    name = extractor.get_symbol_name(node, source_code, config.name_nodes)
     if not name:
         return None
     
@@ -329,7 +335,7 @@ def _extract_function_symbol(
     diagnostics: List[Diagnostic],
 ) -> Optional[Symbol]:
     """Extract function/method symbol using generic approach."""
-    name = extractor.get_function_name(node, source_code, config.name_nodes)
+    name = extractor.get_symbol_name(node, source_code, config.name_nodes)
     if not name:
         return None
     
@@ -363,29 +369,30 @@ def _extract_function_symbol(
     )
 
 
-def _extract_name_from_node(node, source_code: str, config) -> Optional[str]:
-    """Extract name from node using configured name node types."""
-    name = node.child_by_field_name("name")
-    if name is not None:
-        return node_text(name, source_code)
-    for child in node_children(node):
-        if node_type(child) in config.name_nodes:
-            return node_text(child, source_code)
-    
-    return None
-
-
 def extract_file_with_diagnostics(file_path: Path, language: str) -> ExtractionResult:
     """Read a source file and retain both parser dialect and failure diagnostics."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            source_code = f.read()
-    except (OSError, UnicodeError) as e:
+        source_bytes = file_path.read_bytes()
+    except OSError as e:
         return ExtractionResult(
             status=ExtractionStatus.FAILED,
             diagnostics=[Diagnostic("read_failed", f"Could not read source: {e}")],
         )
-    return extract_symbols_with_diagnostics(source_code, language, file_path=file_path)
+    try:
+        source_code = source_bytes.decode("utf-8")
+    except UnicodeDecodeError as e:
+        # Legacy encodings usually only affect comments and strings; keep the symbols.
+        source_code = source_bytes.decode("utf-8", errors="replace")
+        decode_diagnostic = Diagnostic(
+            "decode_replaced",
+            f"Source is not valid UTF-8; undecodable bytes were replaced: {e}",
+        )
+    else:
+        decode_diagnostic = None
+    result = extract_symbols_with_diagnostics(source_code, language, file_path=file_path)
+    if decode_diagnostic is not None:
+        result.diagnostics.insert(0, decode_diagnostic)
+    return result
 
 
 def extract_symbols_from_file(file_path: Path, language: str) -> List[Symbol]:
@@ -523,31 +530,43 @@ def process_repository(repo_path: Path,
         supported_languages[language] = is_supported
         
         for file_path in file_list:
+            # Make path relative to repo root
             try:
-                # Make path relative to repo root
-                try:
-                    # Ensure both paths are absolute
-                    abs_file = file_path.resolve()
-                    abs_repo = repo_path.resolve()
-                    rel_path = abs_file.relative_to(abs_repo)
-                except ValueError:
-                    # Fallback if paths are incompatible
-                    rel_path = Path(file_path.name)
-                
+                # Ensure both paths are absolute
+                abs_file = file_path.resolve()
+                abs_repo = repo_path.resolve()
+                rel_path = abs_file.relative_to(abs_repo)
+            except (OSError, ValueError):
+                # Fallback if paths are incompatible
+                rel_path = Path(file_path.name)
+
+            try:
                 file_info = process_file(file_path, language, max_lines)
-                file_info.path = str(rel_path)
-                
-                # Build proper directory tree
-                rel_parts = list(rel_path.parts)           # e.g. ['src', 'main', 'App.java']
-                file_name = rel_parts.pop()                # keep the filename, pop directories
-                target_dir = _get_or_create_dir(root_dir, rel_parts)
-                target_dir.files.append(file_info)
-                
-                total_processed += 1
-                
             except Exception as e:
-                console.print(f"ERROR: Error processing {file_path}: {e}")
-                continue
+                # stderr stays visible when --quiet swallows progress output.
+                diagnostic_console.print(
+                    f"ERROR: Error processing {file_path}: {e}", markup=False
+                )
+                file_info = FileInfo(
+                    path=str(rel_path),
+                    language=language,
+                    lines=0,
+                    symbols=[],
+                    has_signature_support=False,
+                    extraction_status=ExtractionStatus.FAILED,
+                    diagnostics=[
+                        Diagnostic("process_failed", f"File processing failed: {e}")
+                    ],
+                )
+            file_info.path = str(rel_path)
+            
+            # Build proper directory tree
+            rel_parts = list(rel_path.parts)           # e.g. ['src', 'main', 'App.java']
+            file_name = rel_parts.pop()                # keep the filename, pop directories
+            target_dir = _get_or_create_dir(root_dir, rel_parts)
+            target_dir.files.append(file_info)
+            
+            total_processed += 1
     
     # ----------------------------------------------------------
     # Attach files that didn't match any language
