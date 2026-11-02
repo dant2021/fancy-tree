@@ -51,6 +51,11 @@ function Button(props: ButtonProps): JSX.Element
 
 This project is **work in progress** and we'd love your help! Adding language support is surprisingly easy:
 
+Run the regression suite with `python -m pip install -e . pytest` followed by
+`python -m pytest -q`. CI covers Python 3.9 with the reported parser versions
+(`tree-sitter==0.23.2`, `tree-sitter-language-pack==0.9.1`) and Python 3.12 with
+the latest dependencies.
+
 ### Add a New Language
 1. **Add to `config/languages.yaml`**:
    ```yaml
@@ -76,6 +81,37 @@ This project is **work in progress** and we'd love your help! Adding language su
 **Minimal**: 160+ more languages
 
 *Want better support for your language? Contribute an extractor!*
+
+TypeScript files use the TypeScript grammar for `.ts` and the TSX grammar for
+`.tsx`; both are displayed as `typescript`. Extraction includes named functions,
+classes, methods, interfaces, and arrows assigned to variables, static object
+properties, or class fields. Anonymous callbacks and computed property arrows
+are omitted, but named declarations inside them are still visited. General
+exported constants (including Storybook story objects) and type aliases are not
+currently listed.
+
+Recognized source files always show their language and line count, even when
+they contain no supported symbols. Syntax errors produce a warning alongside
+any recovered symbols; parser, read, and extraction failures also appear as
+per-file warnings. The language support summary reports parser availability,
+not whether every file parsed successfully.
+
+JSON output (`--json`) includes each file's `parser_language`, `extraction_status`,
+and `diagnostics` (code, message, and optional line). Status is `success` for a
+clean extraction, `recovered` for a tree with syntax errors, `parser_unavailable`
+for a missing parser, `failed` for read/parse/extraction failures, or
+`not_attempted` for unclassified/unsupported files. A successful extraction can
+have an empty symbol list. Files that are not valid UTF-8 are still extracted,
+with undecodable bytes replaced and a `decode_replaced` diagnostic. Progress goes
+to stderr, so stdout is valid JSON; `--quiet` suppresses progress while
+preserving diagnostics in the output and errors on stderr.
+Quiet, JSON, and non-interactive scans report missing parsers without prompting
+to install packages.
+
+For Python callers, `extract_symbols_generic` and `extract_symbols_from_file`
+still return symbol lists. Pass `file_path=Path("Component.tsx")` to the generic
+helper to select TSX. Use `extract_symbols_with_diagnostics` or
+`extract_file_with_diagnostics` from `fancy_tree.core` for structured results.
 
 ## Installation
 

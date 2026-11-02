@@ -25,7 +25,7 @@ class EnhancedTreeFormatter:
         lines.append("")
         
         # Language support status
-        lines.append("Language Support:")
+        lines.append("Language Support (parser availability; see per-file warnings):")
         for lang, count in repo_summary.languages.items():
             support_status = "SUPPORTED" if repo_summary.supported_languages.get(lang, False) else "NOT_SUPPORTED"
             lines.append(f"  {lang}: {count} files ({support_status})")
@@ -95,7 +95,6 @@ class EnhancedTreeFormatter:
         for f in files:
             self._format_file(f, lines, depth)
 
-    
     def _format_file(self,
                     file_info: FileInfo,
                     lines: List[str],
@@ -104,13 +103,23 @@ class EnhancedTreeFormatter:
         indent = self._indent(depth)
         filename = Path(file_info.path).name
         
-        # If the file has no symbols we treat it as a generic asset.
-        if not file_info.symbols:
+        # Recognized source files retain metadata even when extraction is empty.
+        if file_info.language == "other":
             lines.append(f"{indent}{filename}")
-            return
+        else:
+            lines.append(
+                f"{indent}{filename} ({file_info.language}, "
+                f"{file_info.lines} lines)"
+            )
 
-        lines.append(f"{indent}{filename} ({file_info.language}, "
-                    f"{file_info.lines} lines)")
+        for diagnostic in file_info.diagnostics:
+            location = (
+                f" at line {diagnostic.line}" if diagnostic.line is not None else ""
+            )
+            lines.append(
+                f"{self._indent(depth + 1)}WARNING ({diagnostic.code}{location}): "
+                f"{diagnostic.message}"
+            )
 
         for sym in file_info.symbols:
             self._format_symbol(sym, lines, depth + 1)

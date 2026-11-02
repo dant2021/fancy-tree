@@ -16,6 +16,7 @@ class LanguageConfig:
     def __init__(self, language: str, config_dict: Dict[str, Any]):
         self.language = language
         self.extensions = config_dict.get("extensions", [])
+        self.parser_by_extension = config_dict.get("parser_by_extension", {})
         self.function_nodes = config_dict.get("function_nodes", [])
         self.class_nodes = config_dict.get("class_nodes", [])
         self.interface_nodes = config_dict.get("interface_nodes", [])
@@ -27,6 +28,11 @@ class LanguageConfig:
     def get_template(self, symbol_type: str) -> str:
         """Get signature template for symbol type with fallback."""
         return self.signature_templates.get(symbol_type, f"{symbol_type} {{name}}")
+
+    def get_parser_language(self, file_path: Optional[Path] = None) -> str:
+        """Choose a grammar without changing the configured/displayed language."""
+        extension = Path(file_path).suffix.lower() if file_path is not None else ""
+        return self.parser_by_extension.get(extension, self.language)
     
     def __repr__(self):
         return f"LanguageConfig({self.language}, {len(self.extensions)} extensions)"
@@ -125,24 +131,24 @@ class ConfigManager:
         
         return extensions
 
-    def _is_parser_available(self, lang_name: str, lang_config: LanguageConfig) -> bool:
-        """Check parser availability through language-pack first, then legacy packages."""
-        try:
-            from tree_sitter_language_pack import get_parser
+    def _is_parser_available(
+        self,
+        lang_name: str,
+        lang_config: LanguageConfig,
+        file_extensions: Optional[Set[str]] = None,
+    ) -> bool:
+        """Check the actual language-pack grammars needed by the detected files."""
+        extensions = set(lang_config.extensions)
+        if file_extensions is not None:
+            extensions &= file_extensions
+        grammars = {
+            lang_config.get_parser_language(Path("source" + extension))
+            for extension in extensions
+        } or {lang_name}
+        # Share the extraction cache so each grammar is only built once per run.
+        from .extraction import get_parser_for_language
 
-            get_parser(lang_name)
-            return True
-        except Exception:
-            pass
-
-        package_name = lang_config.tree_sitter_package
-        module_name = package_name.replace('-', '_')
-
-        try:
-            __import__(module_name)
-            return True
-        except ImportError:
-            return False
+        return all(get_parser_for_language(grammar) is not None for grammar in sorted(grammars))
     
     def detect_available_languages(self, repo_path: Path) -> Dict[str, Dict[str, Any]]:
         """Detect which languages exist in repo and which parsers are available."""
@@ -156,8 +162,10 @@ class ConfigManager:
             
             if has_files:
                 # Check if tree-sitter parser is available
-                package_name = lang_config.tree_sitter_package
-                parser_available = self._is_parser_available(lang_name, lang_config)
+                package_name = "tree-sitter-language-pack"
+                parser_available = self._is_parser_available(
+                    lang_name, lang_config, file_extensions
+                )
                 
                 language_availability[lang_name] = {
                     "has_files": has_files,
@@ -214,7 +222,9 @@ class ConfigManager:
     
     def show_language_status(self, language_availability: Dict[str, Dict[str, Any]]) -> None:
         """Display language support status."""
-        console.print("Language Support Status:")
+        console.print(
+            "Language Support Status (parser availability, not per-file parse results):"
+        )
         
         if not language_availability:
             console.print("  No supported languages detected in repository")
@@ -234,6 +244,7 @@ class ConfigManager:
                     console.print(f"  NOT_SUPPORTED: {lang}: {file_count} files (parser missing)")
                     missing_packages.append(info["package_name"])
         
+        missing_packages = sorted(set(missing_packages))
         if missing_packages:
             console.print(f"\nTIP: To enable full support: pip install {' '.join(missing_packages)}")
             return missing_packages
@@ -258,14 +269,19 @@ def detect_available_languages(repo_path: Path) -> Dict[str, Dict[str, Any]]:
     """Detect available languages in repository."""
     return config_manager.detect_available_languages(repo_path)
 
-def show_language_status_and_install(repo_path: Path) -> Dict[str, Dict[str, Any]]:
+def show_language_status_and_install(
+    repo_path: Path, *, allow_install: bool = True
+) -> Dict[str, Dict[str, Any]]:
     """Show language status and offer to install missing packages."""
     availability = config_manager.detect_available_languages(repo_path)
     missing_packages = config_manager.show_language_status(availability)
     
-    if missing_packages:
+    if missing_packages and allow_install and sys.stdin.isatty():
         config_manager.install_missing_packages(missing_packages)
-        # Re-check availability after installation
+        # Re-check availability after installation, retrying grammars that failed.
+        from .extraction import clear_failed_parsers
+
+        clear_failed_parsers()
         availability = config_manager.detect_available_languages(repo_path)
     
     return availability

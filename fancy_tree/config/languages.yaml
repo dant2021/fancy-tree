@@ -14,8 +14,10 @@ python:
   
 typescript:
   extensions: [".ts", ".tsx"]
-  function_nodes: ["function_declaration", "method_definition", "arrow_function"]
-  class_nodes: ["class_declaration"]
+  parser_by_extension:
+    .tsx: tsx
+  function_nodes: ["function_declaration", "method_definition", "method_signature", "abstract_method_signature", "arrow_function"]
+  class_nodes: ["class_declaration", "abstract_class_declaration"]
   interface_nodes: ["interface_declaration"]
   name_nodes: ["identifier", "type_identifier"]
   signature_templates:
@@ -73,6 +75,7 @@ go:
 
 c:
   extensions: [".c", ".h"]
+  # Declarators are kept only for prototypes; definitions use function_definition.
   function_nodes: ["function_definition", "function_declarator"]
   class_nodes: ["struct_specifier", "union_specifier", "enum_specifier"]
   name_nodes: ["identifier"]

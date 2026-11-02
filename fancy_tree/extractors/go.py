@@ -48,8 +48,8 @@ class GoExtractor(SignatureExtractor):
     # —————————————————— helpers —————————————————— #
 
     def _get_function_name(self, node: Node, src: str) -> str:
-        ident = self.find_child_by_type(node, "identifier")
-        return self.get_node_text(ident, src) if ident else "unknown_func"
+        # Methods name themselves with a field_identifier, not an identifier.
+        return self.get_symbol_name(node, src) or "unknown_func"
 
     def _get_receiver(self, node: Node, src: str) -> Optional[str]:
         recv = node.child_by_field_name("receiver")

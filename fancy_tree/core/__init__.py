@@ -15,8 +15,10 @@ from .discovery import (
 from .extraction import (
     extract_symbols_generic,
     extract_symbols_from_file,
+    extract_symbols_with_diagnostics,
+    extract_file_with_diagnostics,
     process_repository,
-    get_parser_for_language
+    get_parser_for_language,
 )
 from .formatter import (
     format_repository_tree,
@@ -37,9 +39,11 @@ __all__ = [
     # Extraction
     "extract_symbols_generic",
     "extract_symbols_from_file",
+    "extract_symbols_with_diagnostics",
+    "extract_file_with_diagnostics",
     "process_repository",
     "get_parser_for_language",
     # Formatting
     "format_repository_tree",
-    "EnhancedTreeFormatter"
+    "EnhancedTreeFormatter",
 ]
